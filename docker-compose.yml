@@ -1,0 +1,19 @@
+services:
+  fshare-backend:
+    build:
+      context: ./fshare-backend
+      target: production
+    restart: unless-stopped
+    user: "1001:1001"
+    volumes:
+      - /home/fshare/public:/public
+    ports:
+      - "9300:9300"
+
+  fshare-web:
+    build:
+      context: ./fshare-web
+      target: production
+    restart: unless-stopped
+    ports:
+      - "9301:80"

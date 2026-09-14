@@ -1,0 +1,21 @@
+services:
+  fshare-backend:
+    build:
+      context: ./fshare-backend
+      target: development
+    volumes:
+      - ./fshare-backend:/app
+      - ./public:/public
+    command: cargo watch -x run
+    user: "1000:1000"
+
+  fshare-web:
+    build:
+      context: ./fshare-web
+      target: development
+    volumes:
+      - ./fshare-web:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
+    ports:
+      - "5173:5173"
