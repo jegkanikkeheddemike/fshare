@@ -6,8 +6,7 @@ services:
     volumes:
       - ./fshare-backend:/app
       - ./public:/public
-    command: cargo watch -x run
-    user: "1000:1000"
+    user: "${UID}:${GID}"
 
   fshare-web:
     build:

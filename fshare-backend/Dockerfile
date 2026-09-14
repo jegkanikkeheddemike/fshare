@@ -1,4 +1,3 @@
-# Development image
 FROM rust:1.89-bookworm AS development
 
 RUN cargo install cargo-watch
@@ -6,17 +5,17 @@ RUN cargo install cargo-watch
 WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && \
-    echo 'fn main() {}' > src/main.rs && \
-    cargo build && \
-    rm -rf src
+
+RUN mkdir src \
+    && echo 'fn main() {}' > src/main.rs \
+    && cargo build \
+    && rm -rf src
 
 COPY . .
 
 CMD ["cargo", "watch", "-x", "run"]
 
 
-# Build production binary
 FROM rust:1.89-bookworm AS builder
 
 WORKDIR /app
@@ -27,7 +26,6 @@ COPY src ./src
 RUN cargo build --release
 
 
-# Production runtime
 FROM debian:bookworm-slim AS production
 
 RUN apt-get update \
