@@ -18,6 +18,9 @@ FROM node:22-bookworm AS builder
 
 WORKDIR /app
 
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 COPY package*.json ./
 RUN npm ci
 

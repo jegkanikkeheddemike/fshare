@@ -14,6 +14,8 @@ services:
     build:
       context: ./fshare-web
       target: production
+      args:
+        VITE_API_URL: "api.files.f-skipper.com"
     restart: unless-stopped
     ports:
       - "9301:80"

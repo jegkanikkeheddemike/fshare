@@ -6,3 +6,7 @@ edition = "2024"
 [dependencies]
 tokio = {version = "*", features = ["full"]}
 axum = "*"
+uuid = {version = "*", features = ["v4"]}
+anyhow = "*"
+axum-anyhow = "*"
+local-ip-address = "0.6.13"
