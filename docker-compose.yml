@@ -1,4 +1,5 @@
 services:
+
   fshare-backend:
     build:
       context: ./fshare-backend
@@ -7,15 +8,26 @@ services:
     user: "1001:1001"
     volumes:
       - /home/fshare/public:/public
-    ports:
-      - "9300:9300"
 
   fshare-web:
     build:
       context: ./fshare-web
       target: production
-      args:
-        VITE_API_URL: "api.files.f-skipper.com"
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
     restart: unless-stopped
     ports:
-      - "9301:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - fshare-backend
+      - fshare-web
+
+volumes:
+  caddy-data:
+  caddy-config:

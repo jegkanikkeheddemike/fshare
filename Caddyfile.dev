@@ -1,0 +1,11 @@
+fshare.local {
+    tls internal
+
+    handle /api/* {
+        reverse_proxy localhost:9300
+    }
+
+    handle {
+        reverse_proxy localhost:5173
+    }
+}
