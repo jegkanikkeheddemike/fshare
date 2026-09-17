@@ -14,7 +14,7 @@ pub struct InitSessionResp {
 }
 
 pub async fn init_session(req: Request) -> ApiResult<Json<InitSessionResp>> {
-    println!("REQ: {req:#?}");
+    // println!("REQ: {req:#?}");
 
     let Some(host) = req.headers().get("x-forwarded-host") else {
         return Err(axum_anyhow::bad_request(
@@ -33,7 +33,8 @@ pub async fn init_session(req: Request) -> ApiResult<Json<InitSessionResp>> {
     }))
 }
 
-pub async fn approve_session(Path(session_id): Path<String>) -> ApiResult<()> {
+pub async fn approve_session(Path(session_id): Path<String>,req: Request) -> ApiResult<()> {
+    println!("APPROVER REQ: {req:#?}");
     let Ok(session_id) = session_id.parse::<Uuid>() else {
         return Err(axum_anyhow::bad_request(
             "Invalid session id",

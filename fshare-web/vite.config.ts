@@ -9,6 +9,6 @@ export default defineConfig({
     tailwindcss(),
   ],
   server: {
-    allowedHosts: ["fshare.local"]
+    allowedHosts: ["fshare.local"],
   }
 })

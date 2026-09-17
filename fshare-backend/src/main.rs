@@ -1,11 +1,13 @@
 use axum::{Router, routing::get};
 mod sessions;
+mod storage;
 
 #[tokio::main]
 async fn main() {
     let app = Router::new().nest(
         "/api",
         Router::new()
+            .route("/storage/{*path}", get(storage::get_from_storage))
             .route("/init-session", get(sessions::init_session))
             .route(
                 "/approve-session/{session_id}",
@@ -15,6 +17,5 @@ async fn main() {
     );
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:9300").await.unwrap();
-    println!("Running backend on {}", listener.local_addr().unwrap());
     axum::serve(listener, app).await.unwrap();
 }

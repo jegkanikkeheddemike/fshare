@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useParams } from "react-router"
 import { api } from "../api";
 
-export const ApproveSession = () => {
+export const ApproveSessionPage = () => {
 
     const { sessionId } = useParams<{ sessionId: string }>();
     console.log("SESSION_ID:", sessionId);
@@ -13,7 +13,7 @@ export const ApproveSession = () => {
     const approve = async () => {
         setStatus("loading");
 
-        const resp = await fetch(api(`/approve-session/${sessionId}`))
+        const resp = await api(`/approve-session/${sessionId}`)
 
         if (resp.ok) {
             setStatus("success")

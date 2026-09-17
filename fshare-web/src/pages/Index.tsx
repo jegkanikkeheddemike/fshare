@@ -3,7 +3,7 @@ import QRCode from "react-qr-code";
 import { api } from "../api";
 import { useKeycloak } from "@react-keycloak/web";
 
-export const Index = () => {
+export const IndexPage = () => {
 
     const kc = useKeycloak();
 
@@ -12,7 +12,7 @@ export const Index = () => {
     const [sessionStatus, setSessionStatus] = useState<null | "Pending" | "Approved">(null);
 
     useEffect(() => {
-        fetch(api("/init-session")).then(async (resp) => {
+        api("/init-session").then(async (resp) => {
             if (resp.ok) {
                 const { approval_url: approvalUrl, session_id: sessionId } = await resp.json();
                 setApprovalUrl(approvalUrl);
@@ -28,7 +28,7 @@ export const Index = () => {
         }
         (async () => {
             while (true) {
-                const resp = await fetch(api(`/await-status/${sessionId}`));
+                const resp = await api(`/await-status/${sessionId}`);
                 if (!resp.ok) {
                     continue
                 }
