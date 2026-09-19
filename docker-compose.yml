@@ -19,7 +19,7 @@ services:
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
-      - "9000:443"
+      - "9000:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
