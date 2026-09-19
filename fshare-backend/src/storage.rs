@@ -1,16 +1,8 @@
 use std::{fs::Metadata, path::PathBuf};
 
-use axum::{
-    Json,
-    body::Body,
-    extract::{Path, Request},
-    http::{HeaderMap, HeaderValue, StatusCode},
-    response::IntoResponse,
-};
+use axum::{Json, extract::Path, response::IntoResponse};
 use axum_anyhow::ApiResult;
-use tokio::fs::{self, File};
-use tokio::io::{AsyncReadExt, AsyncSeekExt};
-// use tokio_util::io::ReaderStream;
+use tokio::fs::{self};
 
 #[derive(Debug, serde::Serialize)]
 pub struct EntryInfo {
@@ -33,8 +25,6 @@ fn not_found<T>() -> ApiResult<T> {
 
 async fn get_md(path: PathBuf) -> ApiResult<(Metadata, PathBuf)> {
     let path = PathBuf::from("/public").join(path);
-
-    println!("Resulting path: {path:#?}");
 
     let Ok(canon_path) = tokio::fs::canonicalize(&path).await else {
         return not_found();

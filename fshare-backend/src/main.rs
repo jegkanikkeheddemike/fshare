@@ -11,9 +11,9 @@ async fn main() {
     let app = Router::new().nest(
         "/api",
         Router::new()
-            .nest_service("/get-file", ServeDir::new("/public"))
-            .route("/get-dir/", get(storage::get_root_dir))
-            .route("/get-dir/{*path}", get(storage::get_dir))
+            .nest_service("/file", ServeDir::new("/public"))
+            .route("/dir/", get(storage::get_root_dir))
+            .route("/dir/{*path}", get(storage::get_dir))
             
             .route("/init-session", get(sessions::init_session))
             .route(

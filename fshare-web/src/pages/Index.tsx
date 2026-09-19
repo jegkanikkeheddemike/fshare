@@ -22,6 +22,8 @@ export const IndexPage = () => {
         })
     }, []);
 
+
+
     useEffect(() => {
         if (!sessionId) {
             return
@@ -43,9 +45,13 @@ export const IndexPage = () => {
 
             }
         })();
-
-
     }, [sessionId])
+
+    useEffect(() => {
+        if (sessionStatus === "Approved") {
+            window.location.pathname = "/browse/"
+        }
+    },[sessionStatus])
 
     return (
         <div className="flex justify-center items-center h-full">
@@ -57,7 +63,6 @@ export const IndexPage = () => {
                     {sessionStatus}
                     <p>Or copy the link: <a target="_blank" className="text-blue-600" href={approvalUrl}>here</a></p>
                 </>}
-
             </div>
         </div>
     )

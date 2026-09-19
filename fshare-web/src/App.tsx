@@ -6,6 +6,7 @@ import { ReactKeycloakProvider } from "@react-keycloak/web";
 import { PrivateRoute } from "./auth";
 
 import keycloak from "./keycloak.ts"
+import { BrowsePage } from "./pages/Browse.tsx";
 
 
 
@@ -16,6 +17,8 @@ function App() {
         <Routes>
           <Route path="/" element={<IndexPage />} />
           <Route path="/approve_session/:sessionId" element={<PrivateRoute> <ApproveSessionPage /></PrivateRoute>} />
+          <Route path="/browse" element={<BrowsePage />} />
+          <Route path="/browse/*" element={<BrowsePage />} />
         </Routes>
       </BrowserRouter>
     </ReactKeycloakProvider>
