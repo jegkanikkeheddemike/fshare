@@ -1,10 +1,9 @@
-import { useKeycloak } from "@react-keycloak/web"
 import type { ReactNode } from "react";
 import { Link } from "react-router";
+import keycloak from "../keycloak";
 
 export const Header = () => {
 
-    const kc = useKeycloak();
 
     const browse_links: ReactNode[] = ["/"];
     if (window.location.pathname.startsWith("/browse/")) {
@@ -18,8 +17,8 @@ export const Header = () => {
 
             for (let i = 0; i < subs.length; i++) {
                 c_link += subs[i] + "/"
-                browse_links.push(<Link to={c_link}>{subs[i]}</Link>)
-                browse_links.push("/")
+                browse_links.push(<Link id={c_link} to={c_link}>{subs[i]}</Link>)
+                browse_links.push(<span id={c_link + "/"}>/</span>)
             }
         }
     }
@@ -35,7 +34,7 @@ export const Header = () => {
 
         </div>
         <div className="h-full flex flex-row items-center">
-            {!kc.keycloak.authenticated && <Link to={`/login?return_to=${encodeURI(window.location.pathname)}`}>
+            {!keycloak.authenticated && <Link to={`/login?return_to=${encodeURI(window.location.pathname)}`}>
                 <div className="px-4 py-2 m-2 rounded bg-gray-400 hover:bg-gray-500 hover:cursor-pointer">Login</div>
             </Link>}
         </div>

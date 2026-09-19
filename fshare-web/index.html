@@ -1,16 +1,36 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style>
-      @import "tailwindcss";
-    </style>
-    <title>fshare-web</title>
-  </head>
-  <body>
-    <div id="root" class="bg-gray-800 w-dvw h-dvh"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    @import "tailwindcss";
+  </style>
+  <title>fshare-web</title>
+</head>
+
+<body>
+  <div id="root" class="bg-gray-800 w-dvw h-dvh">
+    <div class="w-full h-full flex justify-center items-center">
+      <p class="text-8xl text-white" id="init-throbber">...</p>
+    </div>
+  </div>
+  <script type="module" src="/src/main.tsx"></script>
+  <script>
+    const throbberInterval = setInterval(() => {
+      const t = document.getElementById("init-throbber");
+      if (!t) {
+        clearInterval(throbberInterval);
+        return;
+      }
+      const nextCount = 1+ (t.innerText.length) % 3;
+      t.innerText = ".".repeat(nextCount)
+
+    }, 500)
+
+  </script>
+</body>
+
 </html>

@@ -1,18 +1,21 @@
 import { useEffect, useState } from "react";
 import QRCode from "react-qr-code";
 import { api } from "../api";
-import { useKeycloak } from "@react-keycloak/web";
 import { useNavigate, useSearchParams } from "react-router";
+import keycloak from "../keycloak";
 
 export const LoginPage = () => {
 
-    const kc = useKeycloak();
     const [params,] = useSearchParams()
     const return_to = params.get("return_to") || "/browse/";
-
     const navigate = useNavigate();
 
-    console.log("RETURNING TO:", return_to)
+    useEffect(() => {
+        if (keycloak.authenticated) {
+            navigate(return_to);
+        }
+    }, [navigate, return_to]);
+
 
     const [approvalUrl, setApprovalUrl] = useState<null | string>(null);
     const [sessionId, setSessionId] = useState<null | string>(null);
@@ -54,6 +57,8 @@ export const LoginPage = () => {
     }, [sessionId])
 
     useEffect(() => {
+        // NOTE, custom login through QR or link ignores keycloak. 
+        // TODO: link them later
         if (sessionStatus === "Approved") {
 
             navigate(return_to)
@@ -65,7 +70,7 @@ export const LoginPage = () => {
         <div className="flex justify-center items-center h-full">
             <div className="flex flex-col items-center">
 
-                <h2 className="text-white text-4xl m-3">To approve this session, scan the QR code on an authorized device, or <a className="text-blue-600 hover:cursor-pointer" onClick={() => kc.keycloak.login()}>login</a></h2>
+                <h2 className="text-white text-4xl m-3">To approve this session, scan the QR code on an authorized device, or <a className="text-blue-600 hover:cursor-pointer" onClick={() => keycloak.login()}>login</a></h2>
                 {approvalUrl && <>
                     <QRCode value={approvalUrl} size={256} />
                     {sessionStatus}

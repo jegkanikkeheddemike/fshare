@@ -5,6 +5,7 @@ import { Icon } from "@fluentui/react";
 import { FileIconType, getFileTypeIconProps } from "@fluentui/react-file-type-icons";
 import { Disabled } from "../components/Disabled";
 import { Header } from "../components/Header";
+import keycloak from "../keycloak";
 
 type DirEntry = {
     relative_name: string,
@@ -29,8 +30,6 @@ export const BrowsePage = () => {
         });
     }, [path]);
 
-    console.log(getFileTypeIconProps({ extension: "pdf", size: 96 }));
-
     return <>
         <Header />
         {!dirContent && "loading"}
@@ -39,6 +38,12 @@ export const BrowsePage = () => {
                 <DirEntry entry={e} dir_path={path} />
             </Disabled>)}
         </div>
+        {keycloak.authenticated &&
+            <div
+                className="absolute bottom-0 right-0 w-20 h-20 m-10 bg-amber-300 hover:bg-amber-400 rounded-full hover:cursor-pointer flex justify-center items-center text-6xl select-none"
+                onClick={() => console.log("KAGE123")}
+            >+</div>
+        }
     </>
 }
 
