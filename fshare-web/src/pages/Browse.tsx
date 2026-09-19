@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { api } from "../api";
 import { Icon } from "@fluentui/react";
 import { FileIconType, getFileTypeIconProps } from "@fluentui/react-file-type-icons";
@@ -21,26 +21,6 @@ export const BrowsePage = () => {
 
     const [dirContent, setDirContent] = useState<DirContent | null>(null);
     const [prevPath, setPrevPath] = useState<string | null>(null);
-
-    const navigate = useNavigate();
-
-    useEffect(() => {
-        const handlePopState = () => {
-            const subpaths = window.location.pathname.split("/");
-            subpaths.pop();
-            subpaths.pop();
-            alert(subpaths.join("/"))
-            // console.log("WANT TO GO TO:",subpaths.join("/"))
-            navigate(subpaths.join("/"))
-        };
-        if (window.location.pathname != "/browse/") {
-            window.addEventListener("popstate", handlePopState);
-
-            return () => {
-                window.removeEventListener("popstate", handlePopState);
-            };
-        }
-    }, [navigate, prevPath]);
 
     useEffect(() => {
         api(`/dir/${path}`).then(async resp => {
