@@ -3,7 +3,7 @@ import QRCode from "react-qr-code";
 import { api } from "../api";
 import { useKeycloak } from "@react-keycloak/web";
 
-export const IndexPage = () => {
+export const LoginPage = () => {
 
     const kc = useKeycloak();
 

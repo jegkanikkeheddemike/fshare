@@ -1,5 +1,5 @@
-import { BrowserRouter, Route, Routes } from "react-router";
-import { IndexPage } from "./pages/Index";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { LoginPage } from "./pages/Login.tsx";
 import { ApproveSessionPage } from "./pages/ApproveSession";
 import { ReactKeycloakProvider } from "@react-keycloak/web";
 
@@ -15,10 +15,11 @@ function App() {
     <ReactKeycloakProvider authClient={keycloak}>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<IndexPage />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/approve_session/:sessionId" element={<PrivateRoute> <ApproveSessionPage /></PrivateRoute>} />
-          <Route path="/browse" element={<BrowsePage />} />
+          <Route path="/browse/" element={<BrowsePage />} />
           <Route path="/browse/*" element={<BrowsePage />} />
+          <Route path="/" element={<Navigate to="/browse/"/> } />
         </Routes>
       </BrowserRouter>
     </ReactKeycloakProvider>
