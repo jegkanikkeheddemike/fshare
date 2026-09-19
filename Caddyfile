@@ -1,4 +1,4 @@
-files.f-skipper.com {
+f-skipper.com {
 	handle /api/* {
 		reverse_proxy fshare-backend:9300
 	}
