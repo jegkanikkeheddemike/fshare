@@ -29,7 +29,6 @@ async fn get_md(path: PathBuf) -> ApiResult<(Metadata, PathBuf)> {
     let Ok(canon_path) = tokio::fs::canonicalize(&path).await else {
         return not_found();
     };
-    println!("Canon path: {path:#?}");
     if !canon_path.starts_with("/public/") {
         return not_found();
     }
