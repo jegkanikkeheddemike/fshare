@@ -33,8 +33,7 @@ pub async fn init_session(req: Request) -> ApiResult<Json<InitSessionResp>> {
     }))
 }
 
-pub async fn approve_session(Path(session_id): Path<String>,req: Request) -> ApiResult<()> {
-    println!("APPROVER REQ: {req:#?}");
+pub async fn approve_session(Path(session_id): Path<String>, _req: Request) -> ApiResult<()> {
     let Ok(session_id) = session_id.parse::<Uuid>() else {
         return Err(axum_anyhow::bad_request(
             "Invalid session id",
@@ -63,7 +62,8 @@ mod session_state {
 
     use axum_anyhow::ApiResult;
     use tokio::sync::{Mutex, broadcast};
-    use uuid::Uuid;
+    use tracing::{info, warn};
+use uuid::Uuid;
 
     static APPROVED_SESSIONS: LazyLock<Mutex<HashMap<Uuid, ApprovalStatus>>> =
         LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -88,6 +88,8 @@ mod session_state {
     }
 
     pub async fn approve_session(session_id: Uuid) -> ApiResult<()> {
+        info!("Approving: {session_id}");
+
         let mut session_map = APPROVED_SESSIONS.lock().await;
 
         let Some(entry) = session_map.get_mut(&session_id) else {
@@ -123,7 +125,7 @@ mod session_state {
                             if approved {
                                 Ok(ApprovalStatus::Approved)
                             } else {
-                                eprintln!("Warning: Session broadcast lagged!");
+                                warn!("Session broadcast lagged!");
                                 Ok(ApprovalStatus::Pending)
                             }
                         }

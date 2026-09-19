@@ -3,6 +3,7 @@ use std::{fs::Metadata, path::PathBuf};
 use axum::{Json, extract::Path, response::IntoResponse};
 use axum_anyhow::ApiResult;
 use tokio::fs::{self};
+use tracing::warn;
 
 #[derive(Debug, serde::Serialize)]
 pub struct EntryInfo {
@@ -36,7 +37,7 @@ async fn get_md(path: PathBuf) -> ApiResult<(Metadata, PathBuf)> {
     let md = match tokio::fs::metadata(&canon_path).await {
         Ok(md) => md,
         Err(err) => {
-            eprintln!("WARNING: Failed to read metadata of: {canon_path:?} with error: {err:#?}");
+            warn!("Failed to read metadata of: {canon_path:?} with error: {err:#?}");
             return not_found();
         }
     };
@@ -55,21 +56,21 @@ pub async fn get_dir(Path(path): Path<PathBuf>) -> ApiResult<Json<DirInfo>> {
     let mut dir = match fs::read_dir(canon_path.as_path()).await {
         Ok(dir) => dir,
         Err(err) => {
-            eprintln!("WARNING: Failed to read dir at: {canon_path:?} with error: {err:#?}");
+            warn!("Failed to read dir at: {canon_path:?} with error: {err:#?}");
             return not_found();
         }
     };
     let mut entries = vec![];
     while let Ok(Some(entry)) = dir.next_entry().await {
         let Some(filename) = entry.file_name().to_str().map(|s| s.to_string()) else {
-            println!(
-                "WARNING: Failed to convert filename to valid string: {:#?}",
+            warn!(
+                "Failed to convert filename to valid string: {:#?}",
                 entry.file_name()
             );
             continue;
         };
         let Ok(e_md) = tokio::fs::metadata(entry.path().as_path()).await else {
-            eprintln!("WARNING: Failed to read metadata at {:?}", entry.path());
+            warn!("Failed to read metadata at {:?}", entry.path());
             continue;
         };
         if e_md.is_symlink() {
