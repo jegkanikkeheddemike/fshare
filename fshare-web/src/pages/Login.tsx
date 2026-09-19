@@ -2,10 +2,17 @@ import { useEffect, useState } from "react";
 import QRCode from "react-qr-code";
 import { api } from "../api";
 import { useKeycloak } from "@react-keycloak/web";
+import { useNavigate, useSearchParams } from "react-router";
 
 export const LoginPage = () => {
 
     const kc = useKeycloak();
+    const [params,] = useSearchParams()
+    const return_to = params.get("return_to") || "/browse/";
+
+    const navigate = useNavigate();
+
+    console.log("RETURNING TO:", return_to)
 
     const [approvalUrl, setApprovalUrl] = useState<null | string>(null);
     const [sessionId, setSessionId] = useState<null | string>(null);
@@ -35,7 +42,6 @@ export const LoginPage = () => {
                     continue
                 }
                 const status = await resp.json()
-                console.log("RECEIVED STATUS:", status)
                 if (status == "Pending") {
                     continue
                 }
@@ -49,9 +55,11 @@ export const LoginPage = () => {
 
     useEffect(() => {
         if (sessionStatus === "Approved") {
-            window.location.pathname = "/browse/"
+
+            navigate(return_to)
+            // window.location.href = window.location.origin + return_to;
         }
-    },[sessionStatus])
+    }, [sessionStatus, return_to, navigate])
 
     return (
         <div className="flex justify-center items-center h-full">

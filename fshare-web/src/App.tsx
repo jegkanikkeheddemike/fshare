@@ -15,7 +15,7 @@ function App() {
     <ReactKeycloakProvider authClient={keycloak}>
       <BrowserRouter>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
+          <Route path="/login/" element={<LoginPage />} />
           <Route path="/approve_session/:sessionId" element={<PrivateRoute> <ApproveSessionPage /></PrivateRoute>} />
           <Route path="/browse/" element={<BrowsePage />} />
           <Route path="/browse/*" element={<BrowsePage />} />
