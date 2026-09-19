@@ -9,13 +9,10 @@ services:
     volumes:
       - /home/fshare/public:/public
 
-  fshare-web:
-    build:
-      context: ./fshare-web
-      target: production
-    restart: unless-stopped
-
   caddy:
+    build:
+        context: ./fshare-web
+        target: production
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
@@ -26,7 +23,6 @@ services:
       - caddy-config:/config
     depends_on:
       - fshare-backend
-      - fshare-web
 
 volumes:
   caddy-data:

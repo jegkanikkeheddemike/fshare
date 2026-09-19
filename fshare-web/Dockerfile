@@ -13,8 +13,7 @@ EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 
-# Build
-FROM node:22-bookworm AS builder
+FROM node:22-boorwork AS frontend
 
 WORKDIR /app
 
@@ -22,15 +21,9 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
-
 RUN npm run build
 
 
-# Production
-FROM nginx:alpine AS production
+FROM caddy:2-alpine
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+COPY --from=frontend /app/dist /srv
