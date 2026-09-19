@@ -13,7 +13,7 @@ services:
     build:
         context: ./fshare-web
         target: production
-    image: caddy:2-alpine
+    image: fshare-caddy:latest
     restart: unless-stopped
     ports:
       - "9000:80"

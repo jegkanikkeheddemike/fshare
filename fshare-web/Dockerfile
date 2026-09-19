@@ -10,10 +10,9 @@ COPY . .
 
 EXPOSE 5173
 
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
-
-FROM node:22-boorwork AS frontend
+# Build React
+FROM node:22-bookworm AS frontend
 
 WORKDIR /app
 
@@ -21,9 +20,11 @@ COPY package*.json ./
 RUN npm ci
 
 COPY . .
+
 RUN npm run build
 
 
-FROM caddy:2-alpine
+# Production
+FROM caddy:2-alpine AS production
 
 COPY --from=frontend /app/dist /srv
