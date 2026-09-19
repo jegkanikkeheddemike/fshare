@@ -1,87 +1,100 @@
-use std::path::PathBuf;
+use std::{fs::Metadata, path::PathBuf};
 
-use axum::{Json, body::Body, extract::Path};
+use axum::{
+    Json,
+    body::Body,
+    extract::{Path, Request},
+    http::{HeaderMap, HeaderValue, StatusCode},
+    response::IntoResponse,
+};
 use axum_anyhow::ApiResult;
 use tokio::fs::{self, File};
+use tokio::io::{AsyncReadExt, AsyncSeekExt};
+// use tokio_util::io::ReaderStream;
 
 #[derive(Debug, serde::Serialize)]
-pub enum StorageLookup {
-    Directory(Vec<String>),
-    File(String),
+pub struct EntryInfo {
+    relative_name: String,
+    is_dir: bool,
+    mime: Option<String>,
 }
 
-pub async fn get_from_storage(Path(arg_path): Path<PathBuf>) -> ApiResult<Json<StorageLookup>> {
-    println!("Received from call: {arg_path:?}");
+#[derive(Debug, serde::Serialize)]
+pub struct DirInfo {
+    entries: Vec<EntryInfo>,
+}
 
-    let path = PathBuf::from("public").join(arg_path);
-
-    let not_found = Err(axum_anyhow::not_found(
+fn not_found<T>() -> ApiResult<T> {
+    return Err(axum_anyhow::not_found(
         "Not found",
         "No item or directory at this path",
     ));
+}
 
-    let Ok(canon_path) = path.canonicalize() else {
-        return not_found;
+async fn get_md(path: PathBuf) -> ApiResult<(Metadata, PathBuf)> {
+    let path = PathBuf::from("/public").join(path);
+
+    println!("Resulting path: {path:#?}");
+
+    let Ok(canon_path) = tokio::fs::canonicalize(&path).await else {
+        return not_found();
     };
-    if !canon_path.starts_with("public/") {
-        return not_found;
+    println!("Canon path: {path:#?}");
+    if !canon_path.starts_with("/public/") {
+        return not_found();
     }
 
-    let md = match canon_path.metadata() {
+    let md = match tokio::fs::metadata(&canon_path).await {
         Ok(md) => md,
         Err(err) => {
             eprintln!("WARNING: Failed to read metadata of: {canon_path:?} with error: {err:#?}");
-            return not_found;
+            return not_found();
         }
     };
-    if md.is_dir() {
-        let mut dir = match fs::read_dir(canon_path.as_path()).await {
-            Ok(dir) => dir,
-            Err(err) => {
-                eprintln!("WARNING: Failed to read dir at: {canon_path:?} with error: {err:#?}");
-                return not_found;
-            }
-        };
-        let mut entries = vec![];
-        while let Ok(Some(entry)) = dir.next_entry().await {
-            let Some(filename) = entry.file_name().to_str().map(|s| s.to_string()) else {
-                println!(
-                    "WARNING: Failed to convert filename to valid string: {:#?}",
-                    entry.file_name()
-                );
-                continue;
-            };
-            entries.push(filename);
-        }
+    return Ok((md, canon_path));
+}
 
-        return Ok(Json(StorageLookup::Directory(entries)));
-    } else if md.is_file() {
-        let f = match File::open(canon_path.as_path()).await {
-            Ok(f) => f,
-            Err(err) => {
-                eprintln!("WARNING: Failed to read file at: {canon_path:?} with error: {err:#?}");
-                return not_found;
-            }
-        };
-        // let Some(filename) = canon_path
-        //     .file_name()
-        //     .expect("Will always have a filename")
-        //     .to_str()
-        //     .map(|s| s.to_string())
-        // else {
-        //     println!(
-        //         "WARNING: Failed to convert filename to valid string: {:#?}",
-        //         canon_path.file_name()
-        //     );
-        //     return not_found;
-        // };
-        let mime = mime_guess::from_path(canon_path.as_path()).first_or_octet_stream();
+pub async fn get_root_dir() -> impl IntoResponse {
+    return get_dir(Path(PathBuf::from(""))).await;
+}
 
-        todo!()
-    } else {
-        return Err(axum_anyhow::forbidden(
-            "Symlink found",
-            "Following symlinks is currently not permitted",
-        ));
+pub async fn get_dir(Path(path): Path<PathBuf>) -> ApiResult<Json<DirInfo>> {
+    let (md, canon_path) = get_md(path).await?;
+    if !md.is_dir() {
+        return not_found();
     }
+    let mut dir = match fs::read_dir(canon_path.as_path()).await {
+        Ok(dir) => dir,
+        Err(err) => {
+            eprintln!("WARNING: Failed to read dir at: {canon_path:?} with error: {err:#?}");
+            return not_found();
+        }
+    };
+    let mut entries = vec![];
+    while let Ok(Some(entry)) = dir.next_entry().await {
+        let Some(filename) = entry.file_name().to_str().map(|s| s.to_string()) else {
+            println!(
+                "WARNING: Failed to convert filename to valid string: {:#?}",
+                entry.file_name()
+            );
+            continue;
+        };
+        let Ok(e_md) = tokio::fs::metadata(entry.path().as_path()).await else {
+            eprintln!("WARNING: Failed to read metadata at {:?}", entry.path());
+            continue;
+        };
+        if e_md.is_symlink() {
+            // Ignore symlinks
+            continue;
+        }
+        entries.push(EntryInfo {
+            is_dir: e_md.is_dir(),
+            mime: mime_guess::from_path(&filename)
+                .first()
+                .map(|m| m.to_string()),
+            relative_name: filename,
+        });
+    }
+
+    return Ok(Json(DirInfo { entries }));
 }

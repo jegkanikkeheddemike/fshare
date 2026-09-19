@@ -1,4 +1,8 @@
-use axum::{Router, routing::get};
+use axum::{
+    Router,
+    routing::{get},
+};
+use tower_http::services::ServeDir;
 mod sessions;
 mod storage;
 
@@ -7,7 +11,10 @@ async fn main() {
     let app = Router::new().nest(
         "/api",
         Router::new()
-            .route("/storage/{*path}", get(storage::get_from_storage))
+            .nest_service("/get-file", ServeDir::new("/public"))
+            .route("/get-dir/", get(storage::get_root_dir))
+            .route("/get-dir/{*path}", get(storage::get_dir))
+            
             .route("/init-session", get(sessions::init_session))
             .route(
                 "/approve-session/{session_id}",
