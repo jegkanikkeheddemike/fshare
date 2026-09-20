@@ -16,3 +16,5 @@ mime_guess = "2.0.5"
 tower-http = { version = "0.7.1", features = ["fs","trace"] }
 tracing = "*"
 tracing-subscriber = "*"
+redis = { version = "1.7.0", features = ["tokio-comp"] }
+axum-cookie = "0.3.0"

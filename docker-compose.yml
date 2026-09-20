@@ -8,6 +8,9 @@ services:
     user: "1001:1001"
     volumes:
       - /home/fshare/public:/public
+  redis:
+    image: redis:latest
+    restart: unless-stopped
 
   caddy:
     build:

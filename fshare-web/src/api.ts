@@ -1,17 +1,10 @@
-import keycloak from "./keycloak";
 
 export const api = async (endpoint: string, options?: RequestInit) => {
-
-    const token = keycloak.idToken;
-
-    options = options || { headers: {} }
-
-    if (token) {
+    if (options?.body) {
         options.headers = {
             ...options.headers,
-            "Authorization": `Bearer ${token}`
+            "Content-Type": "Application/json"
         }
     }
-
-    return await fetch("/api"+ endpoint, options)
+    return await fetch("/api" + endpoint, options)
 }

@@ -1,11 +1,18 @@
-use axum::{Router, routing::get};
+use axum::{Router, routing::{get, post}};
+use axum_cookie::CookieLayer;
+use redis::{RedisConnectionInfo, aio::MultiplexedConnection};
 use tower_http::{services::ServeDir, trace::TraceLayer};
 mod sessions;
 mod storage;
 
+mod redis_conn;
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
+
+    redis_conn::init().await.unwrap();
+
     let app = Router::new()
         .nest(
             "/api",
@@ -14,13 +21,16 @@ async fn main() {
                 .route("/dir/", get(storage::get_root_dir))
                 .route("/dir/{*path}", get(storage::get_dir))
                 .route("/init-session", get(sessions::init_session))
+                .route("/authenticate-session", post(sessions::authenticate_session))
+                .route("/reload-session", get(sessions::reload_session))
                 .route(
                     "/approve-session/{session_id}",
                     get(sessions::approve_session),
                 )
-                .route("/await-status/{session_id}", get(sessions::await_status)),
+                .route("/await-status", get(sessions::await_status)),
         )
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        .layer(CookieLayer::default());
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:9300").await.unwrap();
     axum::serve(listener, app).await.unwrap();
