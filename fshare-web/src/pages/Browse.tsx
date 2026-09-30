@@ -7,6 +7,8 @@ import { Disabled } from "../components/Disabled";
 import { Header } from "../components/Header";
 import keycloak from "../keycloak";
 
+import meatball from "../assets/meatball.svg"
+
 type DirEntry = {
     relative_name: string,
     is_dir: boolean,
@@ -25,6 +27,8 @@ export const BrowsePage = () => {
     const [prevPath, setPrevPath] = useState<string | null>(null);
 
     const [showMenu, setShowMenu] = useState(false);
+
+    const [activeMeatball, setActiveMeatball] = useState<string | null>(null);
 
     const loadContent = useCallback(() => {
         api(`/dir/${path}`).then(async resp => {
@@ -71,12 +75,31 @@ export const BrowsePage = () => {
 
     }, [dirContent, path, loadContent]);
 
+
+    const deleteItem = useCallback(async (relativeName: string) => {
+
+        dirContent!.entries.find(e => e.relative_name === relativeName)!.loading = true;
+        setDirContent({ entries: [...dirContent!.entries] });
+
+        const resp = await api(`/delete/${path}${relativeName}`, { method: "post" });
+        if (!resp.ok) {
+            console.log("Failed to delete item with error:", await resp.json())
+            alert(`Failed to delete item: ${path}${relativeName}`);
+        }
+        loadContent();
+    }, [path, loadContent, dirContent, setDirContent]);
     return <>
         <Header />
         {!dirContent && "loading"}
-        <div className="flex flex-wrap">
+        <div className="flex flex-wrap" onClick={() => setActiveMeatball(null)}>
             {dirContent && dirContent.entries.map(e => <Disabled disabled={prevPath !== path} key={path + e.relative_name}>
-                <DirEntry entry={e} dir_path={path} />
+                <DirEntry
+                    entry={e}
+                    dir_path={path}
+                    activeMeatball={e.relative_name === activeMeatball}
+                    setActiveMeatball={() => setActiveMeatball(e.relative_name)}
+                    deleteItem={deleteItem}
+                />
             </Disabled>)}
         </div>
         {keycloak.authenticated &&
@@ -95,17 +118,37 @@ export const BrowsePage = () => {
     </>
 }
 
-const DirEntry = (props: { entry: DirEntry, dir_path: string }) => {
-    const { entry, dir_path } = props;
+const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: boolean, setActiveMeatball: () => void, deleteItem: (relativeName: string) => void }) => {
+    const { entry, dir_path, activeMeatball, setActiveMeatball, deleteItem } = props;
 
-    const content = <div className="w-64 h-24 bg-white hover:bg-gray-100 rounded-xl m-4 flex flex-row justify-between" >
+    const [meatballHover, setMeatballHover] = useState(false);
+
+    const content = <div className={`w-64 h-24 bg-white ${!meatballHover ? "hover:bg-gray-100" : ""} rounded-xl m-4 flex flex-row justify-between`} >
         {!entry.is_dir && entry.mime && <Icon  {...getFileTypeIconProps({ extension: entry.mime?.split("/")[1], size: 96 })} />}
         {!entry.is_dir && !entry.mime && <Icon {...getFileTypeIconProps({ type: FileIconType.genericFile, size: 96 })} />}
         {entry.is_dir && <Icon {...getFileTypeIconProps({ type: FileIconType.folder, size: 96 })} />}
-        <div className="flex h-full flex-col items-end">
-
-            <div className="mr-2 mt-2 bg-pink-500 w-10 h-5">
+        <div className="flex h-full flex-col items-end relative">
+            <div className="overflow-hidden hover:bg-gray-200 rounded-2xl px-1 m-1"
+                onMouseEnter={() => setMeatballHover(true)}
+                onMouseLeave={() => setMeatballHover(false)}
+                onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setActiveMeatball();
+                }}
+            >
+                <img src={meatball} width={30} style={{ marginTop: -4, marginBottom: -4 }} />
             </div>
+            {activeMeatball && <div className="w-36 absolute -right-36 top-0 z-50 rounded-2xl">
+                <button className="h-12 w-full bg-gray-300 hover:bg-gray-400" onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    deleteItem(entry.relative_name);
+                }}>Delete</button>
+                <button className="h-12 w-full bg-gray-300 hover:bg-gray-400">Rename</button>
+                <button className="h-12 w-full bg-gray-300 hover:bg-gray-400">Some other stuff</button>
+                <button className="h-12 w-full bg-gray-300 hover:bg-gray-400">I dunno</button>
+            </div>}
             <p className="mx-3 mb-3 text-wrap wrap-break-word max-w-36 line-clamp-2 text-ellipsis">{entry.relative_name}</p>
         </div>
     </div>

@@ -1,4 +1,4 @@
-use std::{fs::Metadata, path::PathBuf};
+use std::{fs::Metadata, path::PathBuf, time::Duration};
 
 use axum::{Json, extract::Path, response::IntoResponse};
 use axum_anyhow::ApiResult;
@@ -118,6 +118,30 @@ pub async fn mkdir(Path(path): Path<PathBuf>) -> ApiResult<()> {
             "Failed to create dir.",
             "See logs for more datails",
         ));
+    }
+
+    Ok(())
+}
+
+pub async fn delete(Path(path): Path<PathBuf>) -> ApiResult<()> {
+
+    let (md, canon_path) = get_md(path).await?;
+    if md.is_dir() {
+        if let Err(err) = tokio::fs::remove_dir_all(&canon_path).await {
+            error!("Failed to delete directory at {canon_path:#?}: {err:#?}");
+            return Err(axum_anyhow::internal_error(
+                "Failed to remove dir.",
+                "See logs",
+            ));
+        }
+    } else {
+        if let Err(err) = tokio::fs::remove_file(&canon_path).await {
+            error!("Failed to delete file at {canon_path:#?}: {err:#?}");
+            return Err(axum_anyhow::internal_error(
+                "Failed to remove file.",
+                "See logs",
+            ));
+        }
     }
 
     Ok(())

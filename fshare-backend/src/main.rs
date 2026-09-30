@@ -25,6 +25,7 @@ async fn main() {
                 .route("/dir/{*path}", get(storage::get_dir))
 
                 .route("/mkdir/{*path}", post(storage::mkdir))
+                .route("/delete/{*path}", post(storage::delete))
                 .route("/upload/{*path}", post(storage::upload))
                 .route("/init-session", get(sessions::init_session))
                 .route(
