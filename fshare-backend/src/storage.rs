@@ -3,7 +3,7 @@ use std::{fs::Metadata, path::PathBuf};
 use axum::{Json, extract::Path, response::IntoResponse};
 use axum_anyhow::ApiResult;
 use tokio::fs::{self};
-use tracing::warn;
+use tracing::{error, warn};
 
 #[derive(Debug, serde::Serialize)]
 pub struct EntryInfo {
@@ -86,5 +86,43 @@ pub async fn get_dir(Path(path): Path<PathBuf>) -> ApiResult<Json<DirInfo>> {
         });
     }
 
+    entries.sort_by(|a, b| a.relative_name.cmp(&b.relative_name));
+    entries.sort_by_key(|e| !e.is_dir);
+
     return Ok(Json(DirInfo { entries }));
+}
+
+pub async fn mkdir(Path(path): Path<PathBuf>) -> ApiResult<()> {
+    let parent_dir = {
+        let mut t = path.clone();
+        t.pop();
+        t
+    };
+    let (md, mut canon_path) = get_md(parent_dir).await?;
+    if !md.is_dir() {
+        return Err(axum_anyhow::bad_request(
+            "Invalid path",
+            "Parent path is not a directory",
+        ));
+    }
+
+    canon_path.push(path.file_name().unwrap());
+
+    if let Err(err) = tokio::fs::create_dir(&canon_path).await {
+        error!(
+            "Failed to create dir at {canon_path:#?} with err: {:#?}",
+            err
+        );
+
+        return Err(axum_anyhow::internal_error(
+            "Failed to create dir.",
+            "See logs for more datails",
+        ));
+    }
+
+    Ok(())
+}
+
+pub async fn upload(Path(path): Path<PathBuf>) -> ApiResult<()> {
+    Ok(())
 }

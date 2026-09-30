@@ -8,17 +8,8 @@ import { api } from './api.ts';
 // Register icons and pull the fonts from the default Microsoft Fluent CDN:
 initializeFileTypeIcons();
 
-api("/reload-session",).then(async resp => {
-  let token = null;
-  let refresh = null;
-  let existing_session = false;
-  if (resp.ok) {
-    const { token: respToken, refresh: respRefresh } = await resp.json();
-    token = respToken;
-    refresh = respRefresh;
-    existing_session = true;
-    console.log("REALOADING SUCCESS");
-  }
+
+const initApp = (token: string | undefined, refresh: string | undefined, existing_session: boolean, retries: number) => {
   keycloak.init({ token, refreshToken: refresh, checkLoginIframe: false }).then(async () => {
     console.log("KC INIT SUCCESS");
 
@@ -35,7 +26,29 @@ api("/reload-session",).then(async resp => {
         <App />
       </StrictMode>,
     )
+  }, error => {
+    console.log("Init had error:", error);
+    if (retries > 0) {
+      // TODO VIRKER IKKE. DEN SKAL SLETTE SESSION OG REFRESH
+      initApp(undefined, undefined, false, retries - 1);
+    } else {
+      console.log("Failed to init app.")
+    }
   });
+}
+
+api("/reload-session",).then(async resp => {
+  let token = null;
+  let refresh = null;
+  let existing_session = false;
+  if (resp.ok) {
+    const { token: respToken, refresh: respRefresh } = await resp.json();
+    token = respToken;
+    refresh = respRefresh;
+    existing_session = true;
+    console.log("REALOADING SUCCESS");
+  }
+  initApp(token, refresh, existing_session, 1);
 });
 
 

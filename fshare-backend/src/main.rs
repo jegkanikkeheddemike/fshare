@@ -1,4 +1,7 @@
-use axum::{Router, routing::{get, post}};
+use axum::{
+    Router,
+    routing::{get, post},
+};
 use axum_cookie::CookieLayer;
 use redis::{RedisConnectionInfo, aio::MultiplexedConnection};
 use tower_http::{services::ServeDir, trace::TraceLayer};
@@ -20,8 +23,14 @@ async fn main() {
                 .nest_service("/file", ServeDir::new("/public"))
                 .route("/dir/", get(storage::get_root_dir))
                 .route("/dir/{*path}", get(storage::get_dir))
+
+                .route("/mkdir/{*path}", post(storage::mkdir))
+                .route("/upload/{*path}", post(storage::upload))
                 .route("/init-session", get(sessions::init_session))
-                .route("/authenticate-session", post(sessions::authenticate_session))
+                .route(
+                    "/authenticate-session",
+                    post(sessions::authenticate_session),
+                )
                 .route("/reload-session", get(sessions::reload_session))
                 .route(
                     "/approve-session/{session_id}",

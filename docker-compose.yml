@@ -8,7 +8,8 @@ services:
     user: "1001:1001"
     volumes:
       - /home/fshare/public:/public
-    depends_on: redis
+    depends_on: 
+      - redis
   redis:
     image: redis:latest
     restart: unless-stopped
