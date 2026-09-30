@@ -98,12 +98,15 @@ export const BrowsePage = () => {
 const DirEntry = (props: { entry: DirEntry, dir_path: string }) => {
     const { entry, dir_path } = props;
 
-    const content = <div className="w-64 h-24 bg-white hover:bg-gray-100 rounded-xl m-4 flex flex-row justify-between items-end relative" >
+    const content = <div className="w-64 h-24 bg-white hover:bg-gray-100 rounded-xl m-4 flex flex-row justify-between" >
         {!entry.is_dir && entry.mime && <Icon  {...getFileTypeIconProps({ extension: entry.mime?.split("/")[1], size: 96 })} />}
         {!entry.is_dir && !entry.mime && <Icon {...getFileTypeIconProps({ type: FileIconType.genericFile, size: 96 })} />}
         {entry.is_dir && <Icon {...getFileTypeIconProps({ type: FileIconType.folder, size: 96 })} />}
-        <p className="m-3 text-wrap wrap-break-word max-w-36 line-clamp-2 text-ellipsis">{entry.relative_name}</p>
-        <div className="absolute right-0 top-0 m-2 bg-pink-500 w-10 h-5">
+        <div className="flex h-full flex-col items-end">
+
+            <div className="mr-2 mt-2 bg-pink-500 w-10 h-5">
+            </div>
+            <p className="mx-3 mb-3 text-wrap wrap-break-word max-w-36 line-clamp-2 text-ellipsis">{entry.relative_name}</p>
         </div>
     </div>
 
