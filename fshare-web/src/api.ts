@@ -8,7 +8,12 @@ export const api = async (
 
     const headers = new Headers(options.headers);
 
-    if (options.body) {
+    if (
+        options.body &&
+        !headers.has("Content-Type") &&
+        !(options.body instanceof Blob) &&
+        !(options.body instanceof FormData)
+    ) {
         headers.set("Content-Type", "application/json");
     }
 

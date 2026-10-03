@@ -19,6 +19,13 @@ type DirContent = {
     entries: DirEntry[]
 }
 
+
+type FileuploadStatus = {
+    name: string,
+    status: "uploading" | "finished" | "failed",
+    error?: string,
+}
+
 export const BrowsePage = () => {
     const { "*": rawPath } = useParams();
     const path = rawPath || "";
@@ -29,8 +36,11 @@ export const BrowsePage = () => {
     const [prevPath, setPrevPath] = useState<string | null>(null);
 
     const [showMenu, setShowMenu] = useState(false);
+    const [fileSelectActive, setFileSelectActive] = useState(false);
 
     const [activeMeatball, setActiveMeatball] = useState<string | null>(null);
+
+    const [uploadingFiles, setUploadingFiles] = useState<FileuploadStatus[] | null>(null);
 
     const loadContent = useCallback(() => {
         api(`/dir/${path}`).then(async resp => {
@@ -90,26 +100,97 @@ export const BrowsePage = () => {
         }
         loadContent();
     }, [path, loadContent, dirContent, setDirContent]);
+
+    const renameItem = useCallback(async (relativeName: string, newName: string) => {
+        dirContent!.entries.find(e => e.relative_name === relativeName)!.loading = true;
+        setDirContent({ entries: [...dirContent!.entries] });
+
+        const resp = await api(`/rename/${path}${relativeName}`, {
+            method: "post",
+            body: JSON.stringify({ new_name: newName }),
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            console.log("Failed to rename item with error:", err)
+            alert(`Failed to rename item ${path}${relativeName}: ${err.detail}`);
+        }
+        setActiveMeatball(null);
+        loadContent();
+    }, [path, loadContent, dirContent, setDirContent]);
+
+    const uploadFiles = async (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        setFileSelectActive(false);
+        if (!event.target.files) {
+            return
+        };
+        setUploadingFiles(Array.from(event.target.files).map(f => ({ name: f.name, status: "uploading" })));
+
+        try {
+            await Promise.all(
+                Array.from(event.target.files).map(file =>
+                    api(`/upload/${path}${file.name}`, {
+                        method: "POST",
+                        body: file,
+                        headers: {
+                            "Content-Type":
+                                file.type || "application/octet-stream",
+                            "X-Filename": file.name,
+                        },
+                    }).then(async (resp) => {
+                        if (!resp.ok) {
+                            const err = await resp.json();
+                            console.error(`Failed to upload file ${file.name}:`, err);
+                            setUploadingFiles(prev => prev?.map(f => f.name === file.name ? { ...f, status: "failed", error: err.detail } : f) || null);
+                        } else {
+                            setUploadingFiles(prev => prev?.map(f => f.name === file.name ? { ...f, status: "finished" } : f) || null);
+                            loadContent();
+                        }
+
+                    })
+                )
+            );
+        } catch (e) {
+            console.error("Failed to upload files:", e);
+        }
+    };
     return <>
         <Header />
-        {!dirContent && "loading"}
-        <div className="flex flex-wrap" onClick={() => setActiveMeatball(null)}>
-            {dirContent && dirContent.entries.map(e => <Disabled disabled={prevPath !== path} key={path + e.relative_name}>
-                <DirEntry
-                    entry={e}
-                    dir_path={path}
-                    activeMeatball={e.relative_name === activeMeatball}
-                    setActiveMeatball={() => setActiveMeatball(e.relative_name)}
-                    deleteItem={deleteItem}
-                />
-            </Disabled>)}
+        {!dirContent && <div className="text-lg text-white flex-1 flex justify-center items-center">loading</div>}
+        {dirContent && dirContent.entries.length === 0 && <div className="text-lg text-white flex-1 flex justify-center items-center">No items in this directory. Try upload a file or creating a directory.</div>}
+        <div className="flex-1" onClick={() => setActiveMeatball(null)}>
+            <div className="flex flex-wrap">
+                {dirContent && dirContent.entries.map(e => <Disabled disabled={prevPath !== path} key={path + e.relative_name}>
+                    <DirEntry
+                        entry={e}
+                        dir_path={path}
+                        activeMeatball={e.relative_name === activeMeatball}
+                        setActiveMeatball={() => setActiveMeatball(e.relative_name)}
+                        deleteItem={deleteItem}
+                        renameItem={renameItem}
+                    />
+                </Disabled>)}
+            </div>
         </div>
         {auth.isAuthenticated &&
             <div className="flex flex-col absolute bottom-0 right-0 m-10 items-end"
                 onMouseLeave={() => setShowMenu(false)}>
-                {showMenu && <div className="flex flex-col w-40 my-4">
+                {(showMenu || fileSelectActive) && <div className="flex flex-col w-40 my-4">
                     <button className="bg-gray-300 hover:bg-gray-400 cursor-pointer px-5 py-2 my-1 rounded" onClick={mkdir}>Make directory</button>
-                    <button className="bg-gray-300 hover:bg-gray-400 cursor-pointer px-5 py-2 my-1 rounded">Upload Files</button>
+                    <input
+                        id="uploads"
+                        type="file"
+                        className="hidden"
+                        multiple
+                        onChange={uploadFiles}
+                        onClick={() => setFileSelectActive(true)}
+                    />
+
+                    <label
+                        htmlFor="uploads"
+                        className="bg-gray-300 hover:bg-gray-400 cursor-pointer px-5 py-2 my-1 rounded"
+                    >Upload files</label>
                 </div>}
                 <div
                     className="w-20 h-20 bg-amber-300 hover:bg-amber-400 rounded-full hover:cursor-pointer flex justify-center items-center text-6xl select-none"
@@ -117,11 +198,12 @@ export const BrowsePage = () => {
                 >+</div>
             </div>
         }
+        {uploadingFiles && uploadingFiles.length > 0 && <FileUploadStatus files={uploadingFiles} clear={() => setUploadingFiles(null)} />}
     </>
 }
 
-const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: boolean, setActiveMeatball: () => void, deleteItem: (relativeName: string) => void }) => {
-    const { entry, dir_path, activeMeatball, setActiveMeatball, deleteItem } = props;
+const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: boolean, setActiveMeatball: () => void, deleteItem: (relativeName: string) => void, renameItem: (relativeName: string, newName: string) => void }) => {
+    const { entry, dir_path, activeMeatball, setActiveMeatball, deleteItem, renameItem } = props;
 
     const [meatballHover, setMeatballHover] = useState(false);
 
@@ -147,9 +229,16 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
                     e.preventDefault();
                     deleteItem(entry.relative_name);
                 }}>Delete</button>
-                <button className="h-12 w-full bg-gray-300 hover:bg-gray-400">Rename</button>
-                <button className="h-12 w-full bg-gray-300 hover:bg-gray-400">Some other stuff</button>
-                <button className="h-12 w-full bg-gray-300 hover:bg-gray-400">I dunno</button>
+                <button className="h-12 w-full bg-gray-300 hover:bg-gray-400" onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const newName = prompt("Enter new name:", entry.relative_name);
+                    if (newName) {
+                        renameItem(entry.relative_name, newName);
+                    }
+                }}>Rename</button>
+                {/* <button className="h-12 w-full bg-gray-300 hover:bg-gray-400">Some other stuff</button>
+                <button className="h-12 w-full bg-gray-300 hover:bg-gray-400">I dunno</button> */}
             </div>}
             <p className="mx-3 mb-3 text-wrap wrap-break-word max-w-36 line-clamp-2 text-ellipsis">{entry.relative_name}</p>
         </div>
@@ -166,4 +255,43 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
     } else {
         return <a href={`/api/file/${dir_path + entry.relative_name}`}>{content}</a>;
     }
+}
+
+const FileUploadStatus = (props: { files: FileuploadStatus[], clear: () => void }) => {
+    const { files, clear } = props;
+
+    const [dotCounter, setDotCounter] = useState(3);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setDotCounter((prev) => (prev + 1) % 4);
+        }, 500);
+
+        return () => clearInterval(interval);
+    }, []);
+
+    const dots = (
+        <>
+            <span className={dotCounter >= 1 ? "visible" : "invisible"}>.</span>
+            <span className={dotCounter >= 2 ? "visible" : "invisible"}>.</span>
+            <span className={dotCounter >= 3 ? "visible" : "invisible"}>.</span>
+        </>
+    );
+
+
+    return <div className="absolute bottom-0 left-0 m-10">
+        <div className="bg-gray-300 rounded-xl p-4">
+            <div className="flex flex-row justify-between items-center mb-2">
+                <h2 className="text-lg font-bold mb-2">Uploading files</h2>
+                {files.every(f => f.status !== "uploading") && <button className="px-2 py-1 bg-gray-400 hover:bg-gray-500 rounded" onClick={clear}>X</button>}
+            </div>
+            <ul>
+                {files.map((file, index) => (
+                    <li key={index} className="mb-1">
+                        {file.name} - {file.status === "finished" ? "Finished" : file.status === "failed" ? `Failed: ${file.error}` : <>Uploading{dots}</>}
+                    </li>
+                ))}
+            </ul>
+        </div>
+    </div>
 }

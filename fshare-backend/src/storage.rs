@@ -1,9 +1,11 @@
 use std::{fs::Metadata, path::PathBuf};
 
-use axum::{Json, extract::Path, response::IntoResponse};
+use axum::{Json, body::Body, extract::Path, response::IntoResponse};
 use axum_anyhow::ApiResult;
+use futures_util::StreamExt;
 use tokio::fs::{self};
-use tracing::{error, warn};
+use tokio::io::AsyncWriteExt;
+use tracing::{error, info, warn};
 
 #[derive(Debug, serde::Serialize)]
 pub struct EntryInfo {
@@ -124,7 +126,6 @@ pub async fn mkdir(Path(path): Path<PathBuf>) -> ApiResult<()> {
 }
 
 pub async fn delete(Path(path): Path<PathBuf>) -> ApiResult<()> {
-
     let (md, canon_path) = get_md(path).await?;
     if md.is_dir() {
         if let Err(err) = tokio::fs::remove_dir_all(&canon_path).await {
@@ -147,6 +148,93 @@ pub async fn delete(Path(path): Path<PathBuf>) -> ApiResult<()> {
     Ok(())
 }
 
-pub async fn upload(Path(path): Path<PathBuf>) -> ApiResult<()> {
+#[derive(Debug, serde::Deserialize)]
+pub struct RenameRequest {
+    new_name: String,
+}
+
+pub async fn rename(
+    Path(path): Path<PathBuf>,
+    Json(rename_req): Json<RenameRequest>,
+) -> ApiResult<()> {
+    let (_md, canon_path) = get_md(path).await?;
+
+    let new_path = canon_path.parent().unwrap().join(rename_req.new_name);
+
+    match get_md(new_path.clone()).await {
+        Ok((md, _)) => {
+            if !md.is_dir() {
+                return Err(axum_anyhow::bad_request(
+                    "Failed to rename item.",
+                    "File already exists at destination path.",
+                ));
+            }
+        }
+        Err(_) => {
+            //Destination does not exist, we can proceed with the rename
+        }
+    };
+
+    tokio::fs::rename(&canon_path, new_path)
+        .await
+        .map_err(|err| {
+            info!(
+                "Failed to rename item at {canon_path:#?} with err: {:#?}",
+                err
+            );
+            return axum_anyhow::internal_error("Failed to rename item.", &err.to_string());
+        })?;
+
+    Ok(())
+}
+
+pub async fn upload(Path(path): Path<PathBuf>, body: Body) -> ApiResult<()> {
+    let parent_dir = {
+        let mut t = path.clone();
+        t.pop();
+        t
+    };
+    let (md, mut canon_path) = get_md(parent_dir).await?;
+    if !md.is_dir() {
+        return Err(axum_anyhow::bad_request(
+            "Invalid path",
+            "Parent path is not a directory",
+        ));
+    }
+
+    canon_path.push(path.file_name().unwrap());
+
+    let mut file = match tokio::fs::File::create(&canon_path).await {
+        Ok(file) => file,
+        Err(err) => {
+            error!(
+                "Failed to create file at {canon_path:#?} with err: {:#?}",
+                err
+            );
+            return Err(axum_anyhow::internal_error(
+                "Failed to create file",
+                "See logs for more details",
+            ));
+        }
+    };
+    let mut stream = body.into_data_stream();
+
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|_| {
+            axum_anyhow::internal_error(
+                "Failed to read chunk from request body",
+                "Perhaps fix the request.",
+            )
+        })?;
+
+        file.write_all(&chunk).await.map_err(|err| {
+            error!("Failed to write chunk to file at {canon_path:#?}: {err:#?}");
+            axum_anyhow::internal_error(
+                "Failed to write chunk to file",
+                "See logs for more details",
+            )
+        })?;
+    }
+
     Ok(())
 }

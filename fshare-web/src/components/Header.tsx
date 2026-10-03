@@ -17,8 +17,8 @@ export const Header = () => {
 
             for (let i = 0; i < subs.length; i++) {
                 c_link += subs[i] + "/"
-                browse_links.push(<Link id={c_link} to={c_link}>{subs[i]}</Link>)
-                browse_links.push(<span id={c_link + "/"}>/</span>)
+                browse_links.push(<Link key={c_link} to={c_link}>{subs[i]}</Link>)
+                browse_links.push(<span key={c_link + "/"}>/</span>)
             }
         }
     }

@@ -633,6 +633,7 @@ dependencies = [
  "axum-cookie",
  "axum-keycloak-auth",
  "ctrlc",
+ "futures-util",
  "local-ip-address",
  "mime_guess",
  "redis",
