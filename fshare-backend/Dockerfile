@@ -23,7 +23,11 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 
-RUN cargo build --release
+RUN --mount=type=cache,target=/app/target \
+    --mount=type=cache,target=/var/cache/cargo \
+    CARGO_HOME=/var/cache/cargo \
+    cargo build --release \
+    && cp /app/target/release/fshare-backend /usr/local/bin/fshare-backend
 
 
 FROM debian:bookworm-slim AS production
@@ -32,7 +36,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /app/target/release/fshare-backend /usr/local/bin/fshare-backend
+COPY --from=builder /usr/local/bin/fshare-backend /usr/local/bin/fshare-backend
 
 EXPOSE 9100
 
