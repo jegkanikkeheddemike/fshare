@@ -18,3 +18,4 @@ tracing = "*"
 tracing-subscriber = "*"
 redis = { version = "1.7.0", features = ["tokio-comp"] }
 axum-cookie = "0.3.0"
+axum-keycloak-auth = "0.8.3"

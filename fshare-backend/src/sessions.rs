@@ -1,4 +1,11 @@
-use axum::{Json, extract::Path, http::HeaderMap};
+use axum::{
+    Json,
+    body::Body,
+    extract::{Path, Request},
+    http::{HeaderMap, header},
+    middleware::Next,
+    response::Response,
+};
 use axum_anyhow::ApiResult;
 use axum_cookie::{CookieManager, cookie::Cookie};
 use tracing::info;
@@ -122,6 +129,44 @@ pub async fn await_status(cookies: CookieManager) -> ApiResult<()> {
     session_state::await_approval(session_id).await
 }
 
+pub async fn inject_keycloak_token(mut request: Request<Body>, next: Next) -> Response {
+    // Get your session cookie
+    let session_id = request
+        .headers()
+        .get(header::COOKIE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|cookies| {
+            cookies.split(';').find_map(|cookie| {
+                let cookie = cookie.trim();
+                if cookie.starts_with("session=") {
+                    Some(cookie.trim_start_matches("session=").to_string())
+                } else {
+                    None
+                }
+            })
+        });
+
+    if let Some(session_id) = session_id {
+        let mut redis = redis_conn::get().await;
+
+        if let Some(pair) = redis.get(format!("SESSION/{session_id}")).await.unwrap() {
+            let (token, _refresh) = pair.split_once("/").unwrap();
+            let value = format!("Bearer {}", token);
+
+            info!("Injecting token for session {session_id}: {}", value);
+
+            request
+                .headers_mut()
+                .insert(header::AUTHORIZATION, value.parse().unwrap());
+        } else {
+            info!("No session found for {session_id}");
+        }
+    } else {
+        info!("No session cookie found in {request:#?}");
+    }
+
+    next.run(request).await
+}
 mod session_state {
     use std::{sync::LazyLock, time::Duration};
 
