@@ -34,9 +34,13 @@ export const Header = () => {
 
         </div>
         <div className="h-full flex flex-row items-center">
-            {!auth.isAuthenticated && <Link to={`/login`} state={{ returnTo: window.location.pathname }}>
-                <div className="px-4 py-2 m-2 rounded bg-gray-400 hover:bg-gray-500 hover:cursor-pointer">Login</div>
-            </Link>}
+            {!auth.isAuthenticated &&
+                <button className="px-4 py-2 m-2 rounded bg-gray-400 hover:bg-gray-500 hover:cursor-pointer" onClick={() => {
+                    auth.signinRedirect({ state: { returnTo: window.location.pathname } })
+                }}>
+                    Login
+                </button>
+            }
         </div>
     </div>
 }
