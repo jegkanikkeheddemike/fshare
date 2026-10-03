@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
+import { useAuth } from "react-oidc-context";
 import { Link } from "react-router";
-import keycloak from "../keycloak";
 
 export const Header = () => {
-
+    const auth = useAuth();
 
     const browse_links: ReactNode[] = ["/"];
     if (window.location.pathname.startsWith("/browse/")) {
@@ -34,7 +34,7 @@ export const Header = () => {
 
         </div>
         <div className="h-full flex flex-row items-center">
-            {!keycloak.authenticated && <Link to={`/login?return_to=${encodeURI(window.location.pathname)}`}>
+            {!auth.isAuthenticated && <Link to={`/login`} state={{ returnTo: window.location.pathname }}>
                 <div className="px-4 py-2 m-2 rounded bg-gray-400 hover:bg-gray-500 hover:cursor-pointer">Login</div>
             </Link>}
         </div>

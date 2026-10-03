@@ -1,14 +1,13 @@
-import { useEffect, type ReactNode } from "react";
-import keycloak from "../keycloak";
+import { type ReactNode } from "react";
+import { useAuth } from "react-oidc-context";
 
 export const PrivateRoute = ({ children }: { children: ReactNode }) => {
-    useEffect(() => {
-        if (!keycloak.authenticated) {
-            keycloak.login();
-        }
-    }, [])
 
-    if (!keycloak.authenticated) {
+    const auth = useAuth();
+
+
+    if (!auth.isAuthenticated) {
+        auth.signinRedirect({ state: { returnTo: window.location.pathname } });
         return <p>Redirecting to login...</p>;
     }
 

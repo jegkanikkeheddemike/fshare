@@ -1,10 +1,23 @@
+import { userManager } from "./oidc";
 
-export const api = async (endpoint: string, options?: RequestInit) => {
-    if (options?.body) {
-        options.headers = {
-            ...options.headers,
-            "Content-Type": "Application/json"
-        }
+export const api = async (
+    endpoint: string,
+    options: RequestInit = {}
+) => {
+    const user = await userManager.getUser();
+
+    const headers = new Headers(options.headers);
+
+    if (options.body) {
+        headers.set("Content-Type", "application/json");
     }
-    return await fetch("/api" + endpoint, options)
-}
+
+    if (user?.access_token) {
+        headers.set("Authorization", `Bearer ${user.access_token}`);
+    }
+
+    return fetch("/api" + endpoint, {
+        ...options,
+        headers,
+    });
+};

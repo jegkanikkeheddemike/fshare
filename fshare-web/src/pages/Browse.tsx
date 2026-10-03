@@ -5,9 +5,9 @@ import { Icon } from "@fluentui/react";
 import { FileIconType, getFileTypeIconProps } from "@fluentui/react-file-type-icons";
 import { Disabled } from "../components/Disabled";
 import { Header } from "../components/Header";
-import keycloak from "../keycloak";
 
 import meatball from "../assets/meatball.svg"
+import { useAuth } from "react-oidc-context";
 
 type DirEntry = {
     relative_name: string,
@@ -22,6 +22,8 @@ type DirContent = {
 export const BrowsePage = () => {
     const { "*": rawPath } = useParams();
     const path = rawPath || "";
+
+    const auth = useAuth();
 
     const [dirContent, setDirContent] = useState<DirContent | null>(null);
     const [prevPath, setPrevPath] = useState<string | null>(null);
@@ -102,7 +104,7 @@ export const BrowsePage = () => {
                 />
             </Disabled>)}
         </div>
-        {keycloak.authenticated &&
+        {auth.isAuthenticated &&
             <div className="flex flex-col absolute bottom-0 right-0 m-10 items-end"
                 onMouseLeave={() => setShowMenu(false)}>
                 {showMenu && <div className="flex flex-col w-40 my-4">
