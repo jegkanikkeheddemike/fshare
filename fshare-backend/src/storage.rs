@@ -1,7 +1,10 @@
 use std::{fs::Metadata, path::PathBuf};
 
-use axum::{Json, body::Body, extract::Path, response::IntoResponse};
+use axum::Extension;
+use axum::{Json, body::Body, extract::Path};
 use axum_anyhow::ApiResult;
+use axum_keycloak_auth::KeycloakAuthStatus;
+use axum_keycloak_auth::decode::ProfileAndEmail;
 use futures_util::StreamExt;
 use tokio::fs::{self};
 use tokio::io::AsyncWriteExt;
@@ -26,15 +29,51 @@ fn not_found<T>() -> ApiResult<T> {
     ));
 }
 
-async fn get_md(path: PathBuf) -> ApiResult<(Metadata, PathBuf)> {
-    let path = PathBuf::from("/public").join(path);
+async fn get_md(
+    path: PathBuf,
+    auth_status: &KeycloakAuthStatus<String, ProfileAndEmail>,
+) -> ApiResult<(Metadata, PathBuf)> {
+    let canon_path = match path.starts_with("My Files") {
+        true => {
+            if let KeycloakAuthStatus::Success(token) = auth_status {
+                let user_dir = PathBuf::from("/users").join(&token.subject);
 
-    let Ok(canon_path) = tokio::fs::canonicalize(&path).await else {
-        return not_found();
+                // Create user dir if it does not exist
+                tokio::fs::create_dir_all(&user_dir).await.map_err(|err| {
+                    error!(
+                        "Failed to create user directory at {user_dir:?} with err: {:#?}",
+                        err
+                    );
+                    return axum_anyhow::internal_error(
+                        "Failed to create user directory",
+                        "See logs for more details",
+                    );
+                })?;
+                let full_path = user_dir.join(path.components().skip(1).collect::<PathBuf>());
+                let Ok(canon_path) = tokio::fs::canonicalize(&full_path).await else {
+                    return not_found();
+                };
+
+                if !full_path.starts_with(format!("/users/{}", &token.subject)) {
+                    return not_found();
+                }
+
+                canon_path
+            } else {
+                return not_found();
+            }
+        }
+        false => {
+            let path = PathBuf::from("/public").join(path);
+            let Ok(canon_path) = tokio::fs::canonicalize(&path).await else {
+                return not_found();
+            };
+            if !canon_path.starts_with("/public/") {
+                return not_found();
+            }
+            canon_path
+        }
     };
-    if !canon_path.starts_with("/public/") {
-        return not_found();
-    }
 
     let md = match tokio::fs::metadata(&canon_path).await {
         Ok(md) => md,
@@ -46,12 +85,33 @@ async fn get_md(path: PathBuf) -> ApiResult<(Metadata, PathBuf)> {
     return Ok((md, canon_path));
 }
 
-pub async fn get_root_dir() -> impl IntoResponse {
-    return get_dir(Path(PathBuf::from(""))).await;
+pub async fn get_root_dir(
+    Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
+) -> ApiResult<Json<DirInfo>> {
+    let mut public_files = get_dir(Path(PathBuf::from("")), Extension(auth_status.clone())).await?;
+
+    if let KeycloakAuthStatus::Success(token) = auth_status {
+        info!(
+            "User {} accessed root dir",
+            token.extra.profile.preferred_username
+        );
+        public_files.entries.push(EntryInfo {
+            relative_name: "My Files".to_string(),
+            is_dir: true,
+            mime: None,
+        });
+    } else {
+        info!("Anonymous user accessed root dir");
+    }
+
+    return Ok(public_files);
 }
 
-pub async fn get_dir(Path(path): Path<PathBuf>) -> ApiResult<Json<DirInfo>> {
-    let (md, canon_path) = get_md(path).await?;
+pub async fn get_dir(
+    Path(path): Path<PathBuf>,
+    Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
+) -> ApiResult<Json<DirInfo>> {
+    let (md, canon_path) = get_md(path, &auth_status).await?;
     if !md.is_dir() {
         return not_found();
     }
@@ -94,13 +154,16 @@ pub async fn get_dir(Path(path): Path<PathBuf>) -> ApiResult<Json<DirInfo>> {
     return Ok(Json(DirInfo { entries }));
 }
 
-pub async fn mkdir(Path(path): Path<PathBuf>) -> ApiResult<()> {
+pub async fn mkdir(
+    Path(path): Path<PathBuf>,
+    Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
+) -> ApiResult<()> {
     let parent_dir = {
         let mut t = path.clone();
         t.pop();
         t
     };
-    let (md, mut canon_path) = get_md(parent_dir).await?;
+    let (md, mut canon_path) = get_md(parent_dir, &auth_status).await?;
     if !md.is_dir() {
         return Err(axum_anyhow::bad_request(
             "Invalid path",
@@ -125,8 +188,11 @@ pub async fn mkdir(Path(path): Path<PathBuf>) -> ApiResult<()> {
     Ok(())
 }
 
-pub async fn delete(Path(path): Path<PathBuf>) -> ApiResult<()> {
-    let (md, canon_path) = get_md(path).await?;
+pub async fn delete(
+    Path(path): Path<PathBuf>,
+    Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
+) -> ApiResult<()> {
+    let (md, canon_path) = get_md(path, &auth_status).await?;
     if md.is_dir() {
         if let Err(err) = tokio::fs::remove_dir_all(&canon_path).await {
             error!("Failed to delete directory at {canon_path:#?}: {err:#?}");
@@ -154,14 +220,15 @@ pub struct RenameRequest {
 }
 
 pub async fn rename(
+    Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
     Path(path): Path<PathBuf>,
     Json(rename_req): Json<RenameRequest>,
 ) -> ApiResult<()> {
-    let (_md, canon_path) = get_md(path).await?;
+    let (_md, canon_path) = get_md(path, &auth_status).await?;
 
     let new_path = canon_path.parent().unwrap().join(rename_req.new_name);
 
-    match get_md(new_path.clone()).await {
+    match get_md(new_path.clone(), &auth_status).await {
         Ok((md, _)) => {
             if !md.is_dir() {
                 return Err(axum_anyhow::bad_request(
@@ -188,13 +255,17 @@ pub async fn rename(
     Ok(())
 }
 
-pub async fn upload(Path(path): Path<PathBuf>, body: Body) -> ApiResult<()> {
+pub async fn upload(
+    Path(path): Path<PathBuf>,
+    Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
+    body: Body,
+) -> ApiResult<()> {
     let parent_dir = {
         let mut t = path.clone();
         t.pop();
         t
     };
-    let (md, mut canon_path) = get_md(parent_dir).await?;
+    let (md, mut canon_path) = get_md(parent_dir, &auth_status).await?;
     if !md.is_dir() {
         return Err(axum_anyhow::bad_request(
             "Invalid path",

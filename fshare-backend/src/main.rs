@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use axum::{
     Router,
     extract::DefaultBodyLimit,
@@ -10,18 +12,19 @@ use axum_keycloak_auth::{
     layer::KeycloakAuthLayer,
 };
 use tower_http::{services::ServeDir, trace::TraceLayer};
+use tracing::info;
 mod storage;
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-    let keycloak_auth_instance = KeycloakAuthInstance::new(
+    let keycloak_auth_instance = Arc::new(KeycloakAuthInstance::new(
         KeycloakConfig::builder()
             .server(Url::parse("https://auth.f-skipper.com/").unwrap())
             .realm(String::from("skippernet"))
             .build(),
-    );
+    ));
 
     let app = Router::new()
         .nest(
@@ -34,7 +37,7 @@ async fn main() {
                 .route("/rename/{*path}", post(storage::rename))
                 .layer(
                     KeycloakAuthLayer::<String>::builder()
-                        .instance(keycloak_auth_instance)
+                        .instance(keycloak_auth_instance.clone())
                         .passthrough_mode(PassthroughMode::Block)
                         .expected_audiences(vec!["account".to_string()])
                         .build(),
@@ -42,6 +45,13 @@ async fn main() {
                 .nest_service("/file", ServeDir::new("/public"))
                 .route("/dir/", get(storage::get_root_dir))
                 .route("/dir/{*path}", get(storage::get_dir)),
+        )
+        .layer(
+            KeycloakAuthLayer::<String>::builder()
+                .instance(keycloak_auth_instance.clone())
+                .passthrough_mode(PassthroughMode::Pass)
+                .expected_audiences(vec!["account".to_string()])
+                .build(),
         )
         .layer(TraceLayer::new_for_http())
         .layer(CookieLayer::default());
