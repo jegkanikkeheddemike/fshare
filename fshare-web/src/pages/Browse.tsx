@@ -236,7 +236,7 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
 
 
     const content = <div className={`w-64 h-24 bg-white ${!meatballHover ? "hover:bg-gray-100" : ""} rounded-xl m-4 flex flex-row justify-between`} >
-        {thumbnail && <div className="overflow-hidden flex justify-center items-center p-1 h-24 max-w-36"><img src={thumbnail} className="rounded-2xl" /></div>}
+        {thumbnail && <div className="overflow-hidden flex justify-center items-center p-1 max-w-36"><img src={thumbnail} className="rounded-xl" /></div>}
         {!thumbnail && !entry.is_dir && entry.mime && <Icon  {...getFileTypeIconProps({ extension: entry.mime?.split("/")[1], size: 96 })} />}
         {!thumbnail && !entry.is_dir && !entry.mime && <Icon {...getFileTypeIconProps({ type: FileIconType.genericFile, size: 96 })} />}
         {entry.is_dir && <Icon {...getFileTypeIconProps({ type: FileIconType.folder, size: 96 })} />}

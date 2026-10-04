@@ -3,7 +3,7 @@ use std::str::FromStr;
 use std::{fs::Metadata, path::PathBuf};
 
 use axum::Extension;
-use axum::extract::{FromRequestParts, Request};
+use axum::extract::Request;
 use axum::http::uri::PathAndQuery;
 use axum::http::{Uri, uri};
 use axum::middleware::Next;
@@ -103,8 +103,6 @@ pub async fn prepare_thumbnail(
             .unwrap()
             .to_string(),
     );
-    info!("Thumbnail req at: {path:#?}");
-
     let (_file_md, file_canon_path) = match get_md(path.clone(), &auth_status).await {
         Ok(r) => r,
         Err(err) => return err.into_response(),
@@ -119,11 +117,10 @@ pub async fn prepare_thumbnail(
 
     match tokio::fs::try_exists(&thumbnail_path).await {
         Ok(false) => {
-            info!("Generating new thumbnail for {file_canon_path:#?}");
             let file_canon_path_clone = file_canon_path.clone();
             let thumbnail_path_clone = thumbnail_path.clone();
             if let Err(err) = tokio::task::spawn_blocking(move || {
-                let thumbnailer = Thumbnailer::new(144, 96);
+                let thumbnailer = Thumbnailer::new(120, 80);
                 match thumbnailer.get(&file_canon_path_clone) {
                     Ok(thumbnail) => {
 
@@ -148,7 +145,6 @@ pub async fn prepare_thumbnail(
             }
         }
         Ok(true) => {
-            info!("Using existing thumbnail for {file_canon_path:#?}");
             // TODO: Check if outdated
         }
         Err(err) => {
@@ -164,8 +160,6 @@ pub async fn prepare_thumbnail(
     let mut parts = uri::Parts::default();
     parts.path_and_query = Some(PathAndQuery::from_str(&format!("/{hash}.png")).unwrap());
     *request.uri_mut() = Uri::from_parts(parts).unwrap();
-
-    info!("REWRITTEN REQUEST: {}", request.uri());
 
     next.run(request).await
 }
