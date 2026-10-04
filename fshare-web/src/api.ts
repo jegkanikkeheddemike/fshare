@@ -1,5 +1,12 @@
 import { userManager } from "./oidc";
 
+
+export type ApiError =  {
+    status: number,
+    title: string,
+    detail: string,
+}
+
 export const api = async (
     endpoint: string,
     options: RequestInit = {}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
-import { api } from "../api";
+import { api, type ApiError } from "../api";
 import { Icon } from "@fluentui/react";
 import { FileIconType, getFileTypeIconProps } from "@fluentui/react-file-type-icons";
 import { Disabled } from "../components/Disabled";
@@ -26,6 +26,7 @@ type FileuploadStatus = {
     error?: string,
 }
 
+
 export const BrowsePage = () => {
     const { "*": rawPath } = useParams();
     const path = rawPath || "";
@@ -42,10 +43,17 @@ export const BrowsePage = () => {
 
     const [uploadingFiles, setUploadingFiles] = useState<FileuploadStatus[] | null>(null);
 
+    const [contentError, setContentError] = useState<ApiError | null>(null);
+
     const loadContent = useCallback(() => {
         api(`/dir/${path}`).then(async resp => {
-            setDirContent(await resp.json());
-            setPrevPath(path);
+            if (resp.ok) {
+                setDirContent(await resp.json());
+                setPrevPath(path);
+                setContentError(null);
+            } else {
+                setContentError(await resp.json());
+            }
         });
     }, [path])
 
@@ -157,8 +165,12 @@ export const BrowsePage = () => {
     };
     return <>
         <Header />
-        {!dirContent && <div className="text-lg text-white flex-1 flex justify-center items-center">loading</div>}
+        {!dirContent && !contentError && <div className="text-lg text-white flex-1 flex justify-center items-center">loading</div>}
         {dirContent && dirContent.entries.length === 0 && <div className="text-lg text-white flex-1 flex justify-center items-center">No items in this directory. Try upload a file or creating a directory.</div>}
+        {contentError && <div className="text-white flex-1 flex flex-col justify-center items-center">
+            <p className="text-xl">{contentError.status} {contentError.title}</p>
+            <p className="text-base">{contentError.detail}</p>
+        </div>}
         <div className="flex-1" onClick={() => setActiveMeatball(null)}>
             <div className="flex flex-wrap">
                 {dirContent && dirContent.entries.map(e => <Disabled disabled={prevPath !== path} key={path + e.relative_name}>
