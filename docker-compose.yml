@@ -4,11 +4,17 @@ services:
       context: ./fshare-backend
       target: production
     restart: unless-stopped
+    depends_on:
+    - redis
     user: "1001:1001"
     volumes:
       - /home/fshare/public:/public
       - ./users:/users
       - ./thumbnails:/thumbnails
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: unless-stopped
 
   caddy:
     build:

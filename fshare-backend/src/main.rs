@@ -16,6 +16,7 @@ use tower_http::{services::ServeDir, trace::TraceLayer};
 
 mod redis_conn;
 mod storage;
+mod access_keys;
 
 #[tokio::main]
 async fn main() {

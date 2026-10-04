@@ -14,6 +14,7 @@ type DirEntry = {
     is_dir: boolean,
     mime: string | null,
     loading: true | null,
+    access_key: string | null,
 }
 type DirContent = {
     entries: DirEntry[]
@@ -82,6 +83,7 @@ export const BrowsePage = () => {
                 loading: true,
                 mime: null,
                 relative_name: name,
+                access_key: null
             }]
         })
 
@@ -283,7 +285,8 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
     if (entry.is_dir) {
         return <Link to={entry.relative_name + "/"}>{content}</Link>
     } else {
-        return <a href={`/api/file/${dir_path + entry.relative_name}`}>{content}</a>;
+        const access_key_part = entry.access_key ? `?access_key=${entry.access_key}` : "";
+        return <a href={`/api/file/${dir_path + entry.relative_name}${access_key_part}`}>{content}</a>;
     }
 }
 

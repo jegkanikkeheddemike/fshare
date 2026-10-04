@@ -19,6 +19,8 @@ use tokio::io::AsyncWriteExt;
 use tracing::{error, info, warn};
 use uuid::Uuid;
 
+use crate::access_keys;
+
 #[derive(Debug, serde::Serialize)]
 pub struct EntryInfo {
     relative_name: String,
@@ -39,39 +41,64 @@ fn not_found<T>() -> ApiResult<T> {
     ));
 }
 
-async fn get_md(
-    path: PathBuf,
-    auth_status: &KeycloakAuthStatus<String, ProfileAndEmail>,
-) -> ApiResult<(Metadata, PathBuf)> {
+fn extract_access_key(path: PathBuf) -> (PathBuf, Option<Uuid>) {
+    let path_str = path.to_str().unwrap();
+
+    if let Some((path_str, args)) = path_str.split_once("?") {
+        let path = PathBuf::from(path_str);
+        let mut access_key = None;
+        for arg in args.split("&") {
+            match arg.split_once("=") {
+                Some(("access_key", value)) => {
+                    access_key = Some(value);
+                    break;
+                }
+                _ => continue,
+            }
+        }
+        let Some(access_key_str) = access_key else {
+            return (path, None);
+        };
+        let Ok(access_key) = access_key_str.parse() else {
+            return (path, None);
+        };
+
+        return (path, Some(access_key));
+    }
+
+    return (path, None);
+}
+
+async fn get_md(path: PathBuf, auth_status: Option<String>) -> ApiResult<(Metadata, PathBuf)> {
     let canon_path = match path.starts_with("My Files") {
         true => {
-            if let KeycloakAuthStatus::Success(token) = auth_status {
-                let user_dir = PathBuf::from("/users").join(&token.subject);
+            let Some(subject) = auth_status else {
+                return not_found();
+            };
 
-                // Create user dir if it does not exist
-                tokio::fs::create_dir_all(&user_dir).await.map_err(|err| {
-                    error!(
-                        "Failed to create user directory at {user_dir:?} with err: {:#?}",
-                        err
-                    );
-                    return axum_anyhow::internal_error(
-                        "Failed to create user directory",
-                        "See logs for more details",
-                    );
-                })?;
-                let full_path = user_dir.join(path.components().skip(1).collect::<PathBuf>());
-                let Ok(canon_path) = tokio::fs::canonicalize(&full_path).await else {
-                    return not_found();
-                };
+            let user_dir = PathBuf::from("/users").join(&subject);
 
-                if !full_path.starts_with(format!("/users/{}", &token.subject)) {
-                    return not_found();
-                }
+            // Create user dir if it does not exist
+            tokio::fs::create_dir_all(&user_dir).await.map_err(|err| {
+                error!(
+                    "Failed to create user directory at {user_dir:?} with err: {:#?}",
+                    err
+                );
+                return axum_anyhow::internal_error(
+                    "Failed to create user directory",
+                    "See logs for more details",
+                );
+            })?;
+            let full_path = user_dir.join(path.components().skip(1).collect::<PathBuf>());
+            let Ok(canon_path) = tokio::fs::canonicalize(&full_path).await else {
+                return not_found();
+            };
 
-                canon_path
-            } else {
+            if !full_path.starts_with(format!("/users/{}", &subject)) {
                 return not_found();
             }
+
+            canon_path
         }
         false => {
             let path = PathBuf::from("/public").join(path);
@@ -95,6 +122,13 @@ async fn get_md(
     return Ok((md, canon_path));
 }
 
+fn get_subject(auth_status: &KeycloakAuthStatus<String, ProfileAndEmail>) -> Option<String> {
+    let KeycloakAuthStatus::Success(token) = auth_status else {
+        return None;
+    };
+    return Some(token.subject.clone());
+}
+
 pub async fn prepare_file_req(
     Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
     mut request: Request,
@@ -105,13 +139,37 @@ pub async fn prepare_file_req(
             .unwrap()
             .to_string(),
     );
-    let (_file_md, canon_path) = match get_md(path.clone(), &auth_status).await {
-        Ok(r) => r,
-        Err(err) => return err.into_response(),
+    info!("PRE PATH: {path:#?}");
+    let (path, access_key) = extract_access_key(path);
+
+    info!("PATH: {path:#?}. AK: {access_key:#?}");
+
+    let path = match access_key {
+        Some(access_key) => {
+            let Some(access_path) = access_keys::get(access_key).await else {
+                //TODO: BEtter message
+                return axum_anyhow::unauthorized(
+                    "Invalid access key",
+                    "Access key is expired, or otherwise invalid",
+                )
+                .into_response();
+            };
+
+            info!("ACCESS_PATH: {path:#?}");
+            access_path
+        }
+        None => {
+            let (_file_md, canon_path) = match get_md(path.clone(), get_subject(&auth_status)).await
+            {
+                Ok(r) => r,
+                Err(err) => return err.into_response(),
+            };
+            canon_path
+        }
     };
 
     let mut parts = uri::Parts::default();
-    parts.path_and_query = Some(PathAndQuery::from_str(canon_path.to_str().unwrap()).unwrap());
+    parts.path_and_query = Some(PathAndQuery::from_str(path.to_str().unwrap()).unwrap());
     *request.uri_mut() = Uri::from_parts(parts).unwrap();
 
     next.run(request).await
@@ -127,7 +185,7 @@ pub async fn prepare_thumbnail(
             .unwrap()
             .to_string(),
     );
-    let (_file_md, file_canon_path) = match get_md(path.clone(), &auth_status).await {
+    let (_file_md, file_canon_path) = match get_md(path.clone(), get_subject(&auth_status)).await {
         Ok(r) => r,
         Err(err) => return err.into_response(),
     };
@@ -212,10 +270,13 @@ pub async fn get_dir(
     Path(path): Path<PathBuf>,
     Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
 ) -> ApiResult<Json<DirInfo>> {
-    let (md, canon_path) = get_md(path, &auth_status).await?;
+    let (md, canon_path) = get_md(path, get_subject(&auth_status)).await?;
     if !md.is_dir() {
         return not_found();
     }
+
+    let create_access_key = canon_path.starts_with("/users/");
+
     let mut dir = match fs::read_dir(canon_path.as_path()).await {
         Ok(dir) => dir,
         Err(err) => {
@@ -245,8 +306,12 @@ pub async fn get_dir(
             mime: mime_guess::from_path(&filename)
                 .first()
                 .map(|m| m.to_string()),
+            access_key: if create_access_key {
+                Some(access_keys::create(canon_path.join(&filename)).await)
+            } else {
+                None
+            },
             relative_name: filename,
-            access_key: None,
         });
     }
 
@@ -265,7 +330,7 @@ pub async fn mkdir(
         t.pop();
         t
     };
-    let (md, mut canon_path) = get_md(parent_dir, &auth_status).await?;
+    let (md, mut canon_path) = get_md(parent_dir, get_subject(&auth_status)).await?;
     if !md.is_dir() {
         return Err(axum_anyhow::bad_request(
             "Invalid path",
@@ -294,7 +359,7 @@ pub async fn delete(
     Path(path): Path<PathBuf>,
     Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
 ) -> ApiResult<()> {
-    let (md, canon_path) = get_md(path, &auth_status).await?;
+    let (md, canon_path) = get_md(path, get_subject(&auth_status)).await?;
     if md.is_dir() {
         if let Err(err) = tokio::fs::remove_dir_all(&canon_path).await {
             error!("Failed to delete directory at {canon_path:#?}: {err:#?}");
@@ -326,11 +391,11 @@ pub async fn rename(
     Path(path): Path<PathBuf>,
     Json(rename_req): Json<RenameRequest>,
 ) -> ApiResult<()> {
-    let (_md, canon_path) = get_md(path, &auth_status).await?;
+    let (_md, canon_path) = get_md(path, get_subject(&auth_status)).await?;
 
     let new_path = canon_path.parent().unwrap().join(rename_req.new_name);
 
-    match get_md(new_path.clone(), &auth_status).await {
+    match get_md(new_path.clone(), get_subject(&auth_status)).await {
         Ok((md, _)) => {
             if !md.is_dir() {
                 return Err(axum_anyhow::bad_request(
@@ -367,7 +432,7 @@ pub async fn upload(
         t.pop();
         t
     };
-    let (md, mut canon_path) = get_md(parent_dir, &auth_status).await?;
+    let (md, mut canon_path) = get_md(parent_dir, get_subject(&auth_status)).await?;
     if !md.is_dir() {
         return Err(axum_anyhow::bad_request(
             "Invalid path",
