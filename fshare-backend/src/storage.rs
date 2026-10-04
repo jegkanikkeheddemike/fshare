@@ -17,12 +17,14 @@ use thumbnails::Thumbnailer;
 use tokio::fs::{self};
 use tokio::io::AsyncWriteExt;
 use tracing::{error, info, warn};
+use uuid::Uuid;
 
 #[derive(Debug, serde::Serialize)]
 pub struct EntryInfo {
     relative_name: String,
     is_dir: bool,
     mime: Option<String>,
+    access_key: Option<Uuid>,
 }
 
 #[derive(Debug, serde::Serialize)]
@@ -91,6 +93,28 @@ async fn get_md(
         }
     };
     return Ok((md, canon_path));
+}
+
+pub async fn prepare_file_req(
+    Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let path = PathBuf::from(
+        urlencoding::decode(&request.uri().to_string()[1..])
+            .unwrap()
+            .to_string(),
+    );
+    let (_file_md, canon_path) = match get_md(path.clone(), &auth_status).await {
+        Ok(r) => r,
+        Err(err) => return err.into_response(),
+    };
+
+    let mut parts = uri::Parts::default();
+    parts.path_and_query = Some(PathAndQuery::from_str(canon_path.to_str().unwrap()).unwrap());
+    *request.uri_mut() = Uri::from_parts(parts).unwrap();
+
+    next.run(request).await
 }
 
 pub async fn prepare_thumbnail(
@@ -177,6 +201,7 @@ pub async fn get_root_dir(
             relative_name: "My Files".to_string(),
             is_dir: true,
             mime: None,
+            access_key: None,
         });
     }
 
@@ -221,6 +246,7 @@ pub async fn get_dir(
                 .first()
                 .map(|m| m.to_string()),
             relative_name: filename,
+            access_key: None,
         });
     }
 

@@ -48,7 +48,12 @@ async fn main() {
                         .fallback_service(ServeDir::new("/thumbnails"))
                         .layer(middleware::from_fn(storage::prepare_thumbnail)),
                 )
-                .nest_service("/file", ServeDir::new("/public"))
+                .nest_service(
+                    "/file",
+                    Router::new()
+                        .fallback_service(ServeDir::new("/"))
+                        .layer(middleware::from_fn(storage::prepare_file_req)),
+                )
                 .route("/dir/", get(storage::get_root_dir))
                 .route("/dir/{*path}", get(storage::get_dir)),
         )
