@@ -13,6 +13,8 @@ use axum_keycloak_auth::{
     layer::KeycloakAuthLayer,
 };
 use tower_http::{services::ServeDir, trace::TraceLayer};
+
+mod redis_conn;
 mod storage;
 
 #[tokio::main]
@@ -25,6 +27,8 @@ async fn main() {
             .realm(String::from("skippernet"))
             .build(),
     ));
+
+    redis_conn::init().await.unwrap();
 
     let app = Router::new()
         .nest(
