@@ -1,11 +1,19 @@
+use std::hash::{DefaultHasher, Hash, Hasher};
+use std::str::FromStr;
 use std::{fs::Metadata, path::PathBuf};
 
 use axum::Extension;
+use axum::extract::{FromRequestParts, Request};
+use axum::http::uri::PathAndQuery;
+use axum::http::{Uri, uri};
+use axum::middleware::Next;
+use axum::response::{IntoResponse, Response};
 use axum::{Json, body::Body, extract::Path};
 use axum_anyhow::ApiResult;
 use axum_keycloak_auth::KeycloakAuthStatus;
 use axum_keycloak_auth::decode::ProfileAndEmail;
 use futures_util::StreamExt;
+use thumbnails::Thumbnailer;
 use tokio::fs::{self};
 use tokio::io::AsyncWriteExt;
 use tracing::{error, info, warn};
@@ -85,23 +93,94 @@ async fn get_md(
     return Ok((md, canon_path));
 }
 
+pub async fn prepare_thumbnail(
+    Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    let path = PathBuf::from(
+        urlencoding::decode(&request.uri().to_string()[1..])
+            .unwrap()
+            .to_string(),
+    );
+    info!("Thumbnail req at: {path:#?}");
+
+    let (_file_md, file_canon_path) = match get_md(path.clone(), &auth_status).await {
+        Ok(r) => r,
+        Err(err) => return err.into_response(),
+    };
+    let mut hasher = DefaultHasher::new();
+    file_canon_path.hash(&mut hasher);
+    let hash = format!("{:x}", hasher.finish());
+
+    let thumbnail_path = PathBuf::from("/thumbnails")
+        .join(&hash)
+        .with_extension("png");
+
+    match tokio::fs::try_exists(&thumbnail_path).await {
+        Ok(false) => {
+            info!("Generating new thumbnail for {file_canon_path:#?}");
+            let file_canon_path_clone = file_canon_path.clone();
+            let thumbnail_path_clone = thumbnail_path.clone();
+            if let Err(err) = tokio::task::spawn_blocking(move || {
+                let thumbnailer = Thumbnailer::new(144, 96);
+                match thumbnailer.get(&file_canon_path_clone) {
+                    Ok(thumbnail) => {
+
+                        thumbnail.save(&thumbnail_path_clone).unwrap();
+                        info!("Generated thumbnail for {file_canon_path_clone:#?} at {thumbnail_path_clone:#?}");
+                    }
+                    Err(err) => {
+                        info!("Failed to generate thumbnail for {file_canon_path_clone:#?} with: {err:#?}");
+                    }
+                };
+            })
+            .await
+            {
+                error!(
+                    "Failed to generate and save thumbnail for {file_canon_path:#?} with err: {err:#?}"
+                );
+                return axum_anyhow::internal_error(
+                    "Failed to generate thumbnail",
+                    "See logs for more details",
+                )
+                .into_response();
+            }
+        }
+        Ok(true) => {
+            info!("Using existing thumbnail for {file_canon_path:#?}");
+            // TODO: Check if outdated
+        }
+        Err(err) => {
+            error!("Failed to check thumbnail dir at {thumbnail_path:#?} with err: {err:#?}");
+            return axum_anyhow::internal_error(
+                "Failed to lookup thumbnail",
+                "See logs for more details.",
+            )
+            .into_response();
+        }
+    };
+
+    let mut parts = uri::Parts::default();
+    parts.path_and_query = Some(PathAndQuery::from_str(&format!("/{hash}.png")).unwrap());
+    *request.uri_mut() = Uri::from_parts(parts).unwrap();
+
+    info!("REWRITTEN REQUEST: {}", request.uri());
+
+    next.run(request).await
+}
+
 pub async fn get_root_dir(
     Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
 ) -> ApiResult<Json<DirInfo>> {
     let mut public_files = get_dir(Path(PathBuf::from("")), Extension(auth_status.clone())).await?;
 
-    if let KeycloakAuthStatus::Success(token) = auth_status {
-        info!(
-            "User {} accessed root dir",
-            token.extra.profile.preferred_username
-        );
+    if let KeycloakAuthStatus::Success(_) = auth_status {
         public_files.entries.push(EntryInfo {
             relative_name: "My Files".to_string(),
             is_dir: true,
             mime: None,
         });
-    } else {
-        info!("Anonymous user accessed root dir");
     }
 
     return Ok(public_files);

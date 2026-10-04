@@ -3,6 +3,7 @@ use std::sync::Arc;
 use axum::{
     Router,
     extract::DefaultBodyLimit,
+    middleware,
     routing::{get, post},
 };
 use axum_cookie::CookieLayer;
@@ -12,7 +13,6 @@ use axum_keycloak_auth::{
     layer::KeycloakAuthLayer,
 };
 use tower_http::{services::ServeDir, trace::TraceLayer};
-use tracing::info;
 mod storage;
 
 #[tokio::main]
@@ -41,6 +41,12 @@ async fn main() {
                         .passthrough_mode(PassthroughMode::Block)
                         .expected_audiences(vec!["account".to_string()])
                         .build(),
+                )
+                .nest_service(
+                    "/thumbnail",
+                    Router::new()
+                        .fallback_service(ServeDir::new("/thumbnails"))
+                        .layer(middleware::from_fn(storage::prepare_thumbnail)),
                 )
                 .nest_service("/file", ServeDir::new("/public"))
                 .route("/dir/", get(storage::get_root_dir))

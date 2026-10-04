@@ -1,5 +1,4 @@
 services:
-
   fshare-backend:
     build:
       context: ./fshare-backend
@@ -9,6 +8,7 @@ services:
     volumes:
       - /home/fshare/public:/public
       - ./users:/users
+      - ./thumbnails:/thumbnails
 
   caddy:
     build:

@@ -217,14 +217,31 @@ export const BrowsePage = () => {
 const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: boolean, setActiveMeatball: () => void, deleteItem: (relativeName: string) => void, renameItem: (relativeName: string, newName: string) => void }) => {
     const { entry, dir_path, activeMeatball, setActiveMeatball, deleteItem, renameItem } = props;
 
+    const auth = useAuth();
+
     const [meatballHover, setMeatballHover] = useState(false);
 
+    const [thumbnail, setThumbnail] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!entry.is_dir) {
+            api(`/thumbnail/${dir_path}${entry.relative_name}`).then(async (resp) => {
+                if (resp.ok) {
+                    const blob = await resp.blob();
+                    setThumbnail(URL.createObjectURL(blob));
+                }
+            });
+        }
+    }, [entry.is_dir, entry.relative_name, dir_path])
+
+
     const content = <div className={`w-64 h-24 bg-white ${!meatballHover ? "hover:bg-gray-100" : ""} rounded-xl m-4 flex flex-row justify-between`} >
-        {!entry.is_dir && entry.mime && <Icon  {...getFileTypeIconProps({ extension: entry.mime?.split("/")[1], size: 96 })} />}
-        {!entry.is_dir && !entry.mime && <Icon {...getFileTypeIconProps({ type: FileIconType.genericFile, size: 96 })} />}
+        {thumbnail && <div className="overflow-hidden flex justify-center items-center p-1 h-24 max-w-36"><img src={thumbnail} className="rounded-2xl" /></div>}
+        {!thumbnail && !entry.is_dir && entry.mime && <Icon  {...getFileTypeIconProps({ extension: entry.mime?.split("/")[1], size: 96 })} />}
+        {!thumbnail && !entry.is_dir && !entry.mime && <Icon {...getFileTypeIconProps({ type: FileIconType.genericFile, size: 96 })} />}
         {entry.is_dir && <Icon {...getFileTypeIconProps({ type: FileIconType.folder, size: 96 })} />}
         <div className="flex h-full flex-col items-end relative">
-            <div className="overflow-hidden hover:bg-gray-200 rounded-2xl px-1 m-1"
+            {<div className={`overflow-hidden hover:bg-gray-200 rounded-2xl px-1 m-1 ${!auth.isAuthenticated ? "invisible" : ""}`}
                 onMouseEnter={() => setMeatballHover(true)}
                 onMouseLeave={() => setMeatballHover(false)}
                 onClick={(e) => {
@@ -234,7 +251,8 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
                 }}
             >
                 <img src={meatball} width={30} style={{ marginTop: -4, marginBottom: -4 }} />
-            </div>
+            </div>}
+
             {activeMeatball && <div className="w-36 absolute -right-36 top-0 z-50 rounded-2xl">
                 <button className="h-12 w-full bg-gray-300 hover:bg-gray-400" onClick={(e) => {
                     e.stopPropagation();
