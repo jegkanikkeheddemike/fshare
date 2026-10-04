@@ -1,4 +1,4 @@
-FROM rust:1.89-bookworm AS development
+FROM rust:bookworm AS development
 
 
 RUN apt-get update \
@@ -31,7 +31,7 @@ COPY . .
 CMD ["cargo", "watch", "-x", "run"]
 
 
-FROM rust:1.89-bookworm AS builder
+FROM rust:bookworm AS builder
 
 
 RUN apt-get update \

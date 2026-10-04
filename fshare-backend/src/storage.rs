@@ -139,10 +139,7 @@ pub async fn prepare_file_req(
             .unwrap()
             .to_string(),
     );
-    info!("PRE PATH: {path:#?}");
     let (path, access_key) = extract_access_key(path);
-
-    info!("PATH: {path:#?}. AK: {access_key:#?}");
 
     let path = match access_key {
         Some(access_key) => {
@@ -155,7 +152,6 @@ pub async fn prepare_file_req(
                 .into_response();
             };
 
-            info!("ACCESS_PATH: {path:#?}");
             access_path
         }
         None => {
@@ -212,7 +208,7 @@ pub async fn prepare_thumbnail(
                     Err(err) => {
                         let err_str = err.to_string();
                         if !err_str.starts_with("Unsupported MIME type") {
-                            info!("Failed to generate thumbnail for {file_canon_path_clone:#?} with: {err:#?}");
+                            error!("Failed to generate thumbnail for {file_canon_path_clone:#?} with: {err:#?}");
                         }
                     }
                 };
@@ -412,7 +408,7 @@ pub async fn rename(
     tokio::fs::rename(&canon_path, new_path)
         .await
         .map_err(|err| {
-            info!(
+            error!(
                 "Failed to rename item at {canon_path:#?} with err: {:#?}",
                 err
             );
