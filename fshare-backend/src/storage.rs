@@ -128,7 +128,10 @@ pub async fn prepare_thumbnail(
                         info!("Generated thumbnail for {file_canon_path_clone:#?} at {thumbnail_path_clone:#?}");
                     }
                     Err(err) => {
-                        info!("Failed to generate thumbnail for {file_canon_path_clone:#?} with: {err:#?}");
+                        let err_str = err.to_string();
+                        if !err_str.starts_with("Unsupported MIME type") {
+                            info!("Failed to generate thumbnail for {file_canon_path_clone:#?} with: {err:#?}");
+                        }
                     }
                 };
             })
