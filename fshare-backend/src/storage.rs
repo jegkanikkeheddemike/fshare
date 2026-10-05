@@ -69,7 +69,7 @@ fn extract_access_key(path: PathBuf) -> (PathBuf, Option<Uuid>) {
     return (path, None);
 }
 
-async fn get_md(path: PathBuf, auth_status: Option<String>) -> ApiResult<(Metadata, PathBuf)> {
+pub async fn get_md(path: PathBuf, auth_status: Option<String>) -> ApiResult<(Metadata, PathBuf)> {
     let canon_path = match path.starts_with("My Files") {
         true => {
             let Some(subject) = auth_status else {
@@ -303,7 +303,7 @@ pub async fn get_dir(
                 .first()
                 .map(|m| m.to_string()),
             access_key: if create_access_key {
-                Some(access_keys::create(canon_path.join(&filename)).await)
+                Some(access_keys::create(canon_path.join(&filename), None).await)
             } else {
                 None
             },

@@ -237,6 +237,21 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
     }, [entry.is_dir, entry.relative_name, dir_path])
 
 
+    const createPublicLink = useCallback((duration: number) => {
+        api(`/access_key/${dir_path}${entry.relative_name}?duration=${duration}`, {method: "post"}).then(async (resp) => {
+            if (!resp.ok) {
+                alert("Creating public link failed")
+                console.error(await resp.json())
+                return
+            }
+            const { key } = await resp.json()
+            window.open(window.location.origin + "/api/file/" + dir_path + entry.relative_name + `?access_key=${key}`);
+
+        });
+    }, [entry, dir_path]);
+
+
+
     const content = <div className={`w-64 h-24 bg-white ${!meatballHover ? "hover:bg-gray-100" : ""} rounded-xl m-4 flex flex-row justify-between`} >
         {thumbnail && <div className="overflow-hidden flex justify-center items-center p-1 max-w-36"><img src={thumbnail} className="rounded-xl" /></div>}
         {!thumbnail && !entry.is_dir && entry.mime && <Icon  {...getFileTypeIconProps({ extension: entry.mime?.split("/")[1], size: 96 })} />}
@@ -269,6 +284,19 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
                         renameItem(entry.relative_name, newName);
                     }
                 }}>Rename</button>
+                {entry.access_key && <button className="h-12 w-full bg-gray-300 hover:bg-gray-400" onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const durationStr = prompt("Link valid duration (seconds):");
+                    const duration = Number(durationStr);
+                    if (Number.isNaN(duration)) {
+                        alert("Invalid duration")
+                        return;
+                    }
+                    createPublicLink(duration);
+
+
+                }}>Create public link</button>}
                 {/* <button className="h-12 w-full bg-gray-300 hover:bg-gray-400">Some other stuff</button>
                 <button className="h-12 w-full bg-gray-300 hover:bg-gray-400">I dunno</button> */}
             </div>}

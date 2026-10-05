@@ -14,9 +14,9 @@ use axum_keycloak_auth::{
 };
 use tower_http::{services::ServeDir, trace::TraceLayer};
 
+mod access_keys;
 mod redis_conn;
 mod storage;
-mod access_keys;
 
 #[tokio::main]
 async fn main() {
@@ -40,6 +40,7 @@ async fn main() {
                 .route("/mkdir/{*path}", post(storage::mkdir))
                 .route("/delete/{*path}", post(storage::delete))
                 .route("/rename/{*path}", post(storage::rename))
+                .route("/access_key/{*path}", post(access_keys::new_access_key))
                 .layer(
                     KeycloakAuthLayer::<String>::builder()
                         .instance(keycloak_auth_instance.clone())
