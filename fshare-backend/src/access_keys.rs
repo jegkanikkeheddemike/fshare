@@ -6,7 +6,8 @@ use axum::{
 };
 use axum_anyhow::ApiResult;
 use axum_keycloak_auth::decode::KeycloakToken;
-use redis::AsyncTypedCommands;
+use redis::{AsyncTypedCommands, IntegerReplyOrNoOp};
+use tracing::error;
 use uuid::Uuid;
 
 use crate::{redis_conn, storage};
@@ -36,10 +37,16 @@ pub async fn create(path: PathBuf, expiration: Option<Duration>) -> Uuid {
     access_key
 }
 
-pub async fn get(access_key: Uuid) -> Option<PathBuf> {
+pub async fn get(access_key: Uuid) -> Option<(PathBuf, usize)> {
     let mut redis = redis_conn::get().await;
     let resp = redis.get(redis_key(access_key)).await.unwrap()?;
-    return resp.parse().ok();
+    let IntegerReplyOrNoOp::IntegerReply(ttl) = redis.ttl(redis_key(access_key)).await.unwrap()
+    else {
+        error!("Found stored access key but no expiration set. This is a BUG!");
+        return None;
+    };
+
+    return Some((resp.parse().ok()?, ttl));
 }
 
 #[derive(serde::Serialize)]

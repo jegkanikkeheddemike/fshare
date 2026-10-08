@@ -1,11 +1,13 @@
+use std::ffi::{OsStr, OsString};
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::path::Component;
 use std::str::FromStr;
 use std::{fs::Metadata, path::PathBuf};
 
 use axum::Extension;
 use axum::extract::Request;
 use axum::http::uri::PathAndQuery;
-use axum::http::{Uri, uri};
+use axum::http::{Uri, header, uri};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, body::Body, extract::Path};
@@ -141,10 +143,9 @@ pub async fn prepare_file_req(
     );
     let (path, access_key) = extract_access_key(path);
 
-    let path = match access_key {
+    let (path, expiration) = match access_key {
         Some(access_key) => {
-            let Some(access_path) = access_keys::get(access_key).await else {
-                //TODO: BEtter message
+            let Some((access_path, expiration)) = access_keys::get(access_key).await else {
                 return axum_anyhow::unauthorized(
                     "Invalid access key",
                     "Access key is expired, or otherwise invalid",
@@ -152,7 +153,7 @@ pub async fn prepare_file_req(
                 .into_response();
             };
 
-            access_path
+            (access_path, Some(expiration))
         }
         None => {
             let (_file_md, canon_path) = match get_md(path.clone(), get_subject(&auth_status)).await
@@ -160,15 +161,34 @@ pub async fn prepare_file_req(
                 Ok(r) => r,
                 Err(err) => return err.into_response(),
             };
-            canon_path
+            (canon_path, None)
         }
     };
 
+    let encoded: PathBuf = path
+        .components()
+        .map(|c| {
+            if let Component::Normal(part) = c {
+                urlencoding::encode(part.to_str().unwrap()).to_string()
+            } else {
+                c.as_os_str().to_str().unwrap().to_string()
+            }
+        })
+        .collect();
+
     let mut parts = uri::Parts::default();
-    parts.path_and_query = Some(PathAndQuery::from_str(path.to_str().unwrap()).unwrap());
+    parts.path_and_query = Some(PathAndQuery::from_str(&encoded.to_str().unwrap()).unwrap());
     *request.uri_mut() = Uri::from_parts(parts).unwrap();
 
-    next.run(request).await
+    let mut resp = next.run(request).await;
+    if let Some(expiration) = expiration {
+        resp.headers_mut().insert(
+            header::CACHE_CONTROL,
+            format!("private,max-age={expiration}").parse().unwrap(),
+        );
+    }
+
+    resp
 }
 
 pub async fn prepare_thumbnail(
