@@ -184,7 +184,7 @@ pub async fn prepare_file_req(
     if let Some(expiration) = expiration {
         resp.headers_mut().insert(
             header::CACHE_CONTROL,
-            format!("private,max-age={expiration}").parse().unwrap(),
+            format!("s-maxage={expiration}").parse().unwrap(),
         );
     }
 
