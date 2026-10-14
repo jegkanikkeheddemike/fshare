@@ -1,4 +1,3 @@
-use std::ffi::{OsStr, OsString};
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::Component;
 use std::str::FromStr;
