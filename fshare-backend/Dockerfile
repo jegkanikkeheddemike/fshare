@@ -1,6 +1,5 @@
 FROM rust:bookworm AS development
 
-
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         pkg-config \
@@ -13,6 +12,17 @@ RUN apt-get update \
         libavutil-dev \
         libswscale-dev \
         libswresample-dev \
+        ca-certificates \
+        curl \
+        tar \
+    && mkdir -p /tmp/pdfium /usr/local/lib \
+    && curl -fsSL \
+        https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F8076/pdfium-linux-x64.tgz \
+        -o /tmp/pdfium.tar.gz \
+    && tar -xzf /tmp/pdfium.tar.gz -C /tmp/pdfium \
+    && cp /tmp/pdfium/lib/libpdfium.so /usr/local/lib/ \
+    && ldconfig \
+    && rm -rf /tmp/pdfium /tmp/pdfium.tar.gz \
     && rm -rf /var/lib/apt/lists/*
 
 RUN cargo install cargo-watch
@@ -33,7 +43,6 @@ CMD ["cargo", "watch", "-x", "run"]
 
 FROM rust:bookworm AS builder
 
-
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         pkg-config \
@@ -46,6 +55,17 @@ RUN apt-get update \
         libavutil-dev \
         libswscale-dev \
         libswresample-dev \
+        ca-certificates \
+        curl \
+        tar \
+    && mkdir -p /tmp/pdfium /usr/local/lib \
+    && curl -fsSL \
+        https://github.com/bblanchon/pdfium-binaries/releases/download/chromium%2F8076/pdfium-linux-x64.tgz \
+        -o /tmp/pdfium.tar.gz \
+    && tar -xzf /tmp/pdfium.tar.gz -C /tmp/pdfium \
+    && cp /tmp/pdfium/lib/libpdfium.so /usr/local/lib/ \
+    && ldconfig \
+    && rm -rf /tmp/pdfium /tmp/pdfium.tar.gz \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -75,12 +95,12 @@ RUN apt-get update \
         ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
 COPY --from=builder /usr/local/bin/fshare-backend /usr/local/bin/fshare-backend
 
-EXPOSE 9100
+# Copy PDFium from the builder instead of downloading it again.
+COPY --from=builder /usr/local/lib/libpdfium.so /usr/local/lib/libpdfium.so
+
+# Register the shared library path.
+RUN ldconfig
 
 CMD ["/usr/local/bin/fshare-backend"]
