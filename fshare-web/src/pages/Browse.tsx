@@ -238,7 +238,7 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
 
 
     const createPublicLink = useCallback((duration: number) => {
-        api(`/access_key/${dir_path}${entry.relative_name}?duration=${duration}`, {method: "post"}).then(async (resp) => {
+        api(`/access_key/${dir_path}${entry.relative_name}?duration=${duration}`, { method: "post" }).then(async (resp) => {
             if (!resp.ok) {
                 alert("Creating public link failed")
                 console.error(await resp.json())
@@ -256,7 +256,8 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
         {thumbnail && <div className="overflow-hidden flex justify-center items-center p-1 max-w-36"><img src={thumbnail} className={`rounded-xl`} /></div>}
         {!thumbnail && !entry.is_dir && entry.mime && <Icon  {...getFileTypeIconProps({ extension: entry.mime?.split("/")[1], size: 96 })} />}
         {!thumbnail && !entry.is_dir && !entry.mime && <Icon {...getFileTypeIconProps({ type: FileIconType.genericFile, size: 96 })} />}
-        {entry.is_dir && <Icon {...getFileTypeIconProps({ type: FileIconType.folder, size: 96 })} />}
+        {entry.is_dir && entry.relative_name === "My Files" && <img src="/locked-folder.svg"></img>}
+        {entry.is_dir && entry.relative_name !== "My Files" && <Icon {...getFileTypeIconProps({ type: FileIconType.folder, size: 96 })} />}
         <div className="flex h-full flex-col items-end relative">
             {<div className={`overflow-hidden hover:bg-gray-200 rounded-2xl px-1 m-1 ${!auth.isAuthenticated ? "invisible" : ""}`}
                 onMouseEnter={() => setMeatballHover(true)}

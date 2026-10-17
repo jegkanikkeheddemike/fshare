@@ -280,6 +280,7 @@ pub async fn get_root_dir(
             access_key: None,
         });
     }
+    public_files.entries.sort_by(|a, b| b.is_dir.cmp(&a.is_dir));
 
     return Ok(public_files);
 }
