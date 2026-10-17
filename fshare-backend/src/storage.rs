@@ -19,6 +19,7 @@ use tokio::fs::{self};
 use tokio::io::AsyncWriteExt;
 use tracing::{error, info, warn};
 use uuid::Uuid;
+use pdfium_render::prelude::*;
 
 use crate::access_keys;
 
@@ -217,7 +218,39 @@ pub async fn prepare_thumbnail(
             let file_canon_path_clone = file_canon_path.clone();
             let thumbnail_path_clone = thumbnail_path.clone();
             if let Err(err) = tokio::task::spawn_blocking(move || {
-                let thumbnailer = Thumbnailer::new(120, 80);
+                const DEFAULT_WH: (u32,u32) = (120,70);
+
+                let (w,h) = {
+                    if file_canon_path_clone.extension().map(|osstr| osstr.to_str()) != Some(Some("pdf")) {
+                        DEFAULT_WH
+                    } else {
+                        let pdfium = Pdfium::default();
+                        let document = pdfium
+                            .load_pdf_from_file(&file_canon_path_clone, None)
+                            .expect("Failed to load PDF");
+        
+                        let page = document.pages().get(0).expect("PDF has no pages");
+                        let page_width = page.width().value;
+                        let page_height = page.height().value;
+
+                        if page_width > page_height {
+                            // Landspace orientation. Let dimensions fit landspace and pdfium will
+                            // automatically make it a landspace png.
+
+                            let ratio = page_width / 120.;
+                            
+                            info!("{file_canon_path_clone:?} IS LANDSCAPE WITH RATIO {ratio} GIVING HEIGHT: {}",page_height / ratio);
+
+                            (120, (page_height / ratio) as u32)
+                        } else {
+                            info!("{file_canon_path_clone:?} IS PORTRAIT");
+                            DEFAULT_WH
+                        }
+                    }
+                };
+
+
+                let thumbnailer = Thumbnailer::new(w,h);
                 match thumbnailer.get(&file_canon_path_clone) {
                     Ok(thumbnail) => {
 
@@ -227,7 +260,7 @@ pub async fn prepare_thumbnail(
                     Err(err) => {
                         let err_str = err.to_string();
                         if !err_str.starts_with("Unsupported MIME type") {
-                            error!("Failed to generate thumbnail for {file_canon_path_clone:#?} with: {err:#?}");
+                            warn!("Failed to generate thumbnail for {file_canon_path_clone:#?} with: {err:#?}");
                         }
                     }
                 };
@@ -245,6 +278,7 @@ pub async fn prepare_thumbnail(
             }
         }
         Ok(true) => {
+            info!("THUMBNAIL EXISTING HIT");
             // TODO: Check if outdated
         }
         Err(err) => {

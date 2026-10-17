@@ -1105,6 +1105,7 @@ dependencies = [
  "futures-util",
  "local-ip-address",
  "mime_guess",
+ "pdfium-render",
  "redis",
  "serde",
  "thumbnails",
