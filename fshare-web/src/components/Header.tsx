@@ -41,6 +41,15 @@ export const Header = () => {
                     Login
                 </button>
             }
+            {auth.isAuthenticated && <button className="px-4 py-2 m-2 rounded bg-gray-400 hover:bg-gray-500 hover:cursor-pointer" onClick={() => {
+                if (window.location.pathname.startsWith(encodeURI("/browse/My Files"))) {
+                    auth.signoutRedirect({ post_logout_redirect_uri: window.location.origin + "/browse/" })
+                } else {
+                    auth.signoutRedirect({ post_logout_redirect_uri: window.location.toString() })
+                }
+            }}>
+                Log out
+            </button>}
         </div>
     </div>
 }
