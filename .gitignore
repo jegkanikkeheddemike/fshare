@@ -1,3 +1,4 @@
-public
-users
-thumbnails
+data/public
+data/users
+data/thumbnails
+target

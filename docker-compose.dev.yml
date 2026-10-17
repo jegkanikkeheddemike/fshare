@@ -5,7 +5,7 @@ services:
       target: development
     volumes:
       - ./fshare-backend:/app
-      - ./public:/public
+      - ./data/public:/public
     user: "${UserID}:${GroupID}"
 
   fshare-web:

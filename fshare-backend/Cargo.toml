@@ -19,7 +19,6 @@ tracing-subscriber = "*"
 axum-cookie = "0.3.0"
 axum-keycloak-auth = "0.8.3"
 futures-util = "0.3.34"
-thumbnails = "*"
-pdfium-render = "*"
+thumbnails = {git = "https://github.com/jegkanikkeheddemike/thumbnails"}
 urlencoding = "2.1.3"
 redis = {version = "*", features = ["aio", "tokio-comp"]}

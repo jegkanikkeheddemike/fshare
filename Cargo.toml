@@ -1,0 +1,3 @@
+[workspace]
+members = ["fshare-backend"]
+resolver = "3"
