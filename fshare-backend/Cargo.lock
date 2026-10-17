@@ -3436,7 +3436,7 @@ dependencies = [
 [[package]]
 name = "thumbnails"
 version = "0.2.1"
-source = "git+https://github.com/jegkanikkeheddemike/thumbnails#8f989464bada7898b715ee9456509022f46c14cb"
+source = "git+https://github.com/jegkanikkeheddemike/thumbnails#ee8c5af457c412902526e6892d2e2d91ac217c90"
 dependencies = [
  "anyhow",
  "image",

@@ -190,7 +190,7 @@ pub async fn prepare_file_req(
     resp
 }
 
-const THUMBNAIL_WH: (u32,u32) = (120,70);
+const THUMBNAIL_MAX_WH: (u32, u32) = (120, 80);
 pub async fn prepare_thumbnail(
     Extension(auth_status): Extension<KeycloakAuthStatus<String, ProfileAndEmail>>,
     mut request: Request,
@@ -201,7 +201,7 @@ pub async fn prepare_thumbnail(
             .unwrap()
             .to_string(),
     );
-    let (_file_md, file_canon_path) = match get_md(path.clone(), get_subject(&auth_status)).await {
+    let (file_md, file_canon_path) = match get_md(path.clone(), get_subject(&auth_status)).await {
         Ok(r) => r,
         Err(err) => return err.into_response(),
     };
@@ -213,12 +213,24 @@ pub async fn prepare_thumbnail(
         .join(&hash)
         .with_extension("png");
 
-    match tokio::fs::try_exists(&thumbnail_path).await {
-        Ok(false) => {
-            let file_canon_path_clone = file_canon_path.clone();
-            let thumbnail_path_clone = thumbnail_path.clone();
-            if let Err(err) = tokio::task::spawn_blocking(move || {
-                let mut thumbnailer = Thumbnailer::new(THUMBNAIL_WH.0,THUMBNAIL_WH.1);
+    let create_new_thumbnail = match tokio::fs::metadata(&thumbnail_path).await {
+        Err(_) => true, // Thumbnail does not exist
+        Ok(thumb_md) => {
+            // Thumbnail is outdated if the thumbnail is older than the last
+            // modifiation to the file
+
+            let outdated = thumb_md.created().unwrap() < file_md.modified().unwrap();
+            if outdated {
+                info!("Thumbnail for {file_canon_path:?} is outdated");
+            }
+            outdated
+        }
+    };
+    if create_new_thumbnail {
+        let file_canon_path_clone = file_canon_path.clone();
+        let thumbnail_path_clone = thumbnail_path.clone();
+        if let Err(err) = tokio::task::spawn_blocking(move || {
+                let mut thumbnailer = Thumbnailer::new(THUMBNAIL_MAX_WH.0,THUMBNAIL_MAX_WH.1);
                 thumbnailer.allow_any_rotation();
 
                 match thumbnailer.get(&file_canon_path_clone) {
@@ -238,7 +250,7 @@ pub async fn prepare_thumbnail(
             .await
             {
                 error!(
-                    "Failed to generate and save thumbnail for {file_canon_path:#?} with err: {err:#?}"
+                    "Failed to generate or save thumbnail for {file_canon_path:#?} at {thumbnail_path:?} with err: {err:#?}"
                 );
                 return axum_anyhow::internal_error(
                     "Failed to generate thumbnail",
@@ -246,19 +258,7 @@ pub async fn prepare_thumbnail(
                 )
                 .into_response();
             }
-        }
-        Ok(true) => {
-            // TODO: Check if outdated
-        }
-        Err(err) => {
-            error!("Failed to check thumbnail dir at {thumbnail_path:#?} with err: {err:#?}");
-            return axum_anyhow::internal_error(
-                "Failed to lookup thumbnail",
-                "See logs for more details.",
-            )
-            .into_response();
-        }
-    };
+    }
 
     let mut parts = uri::Parts::default();
     parts.path_and_query = Some(PathAndQuery::from_str(&format!("/{hash}.png")).unwrap());
