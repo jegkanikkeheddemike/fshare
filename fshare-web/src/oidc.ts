@@ -6,7 +6,7 @@ export const userManager = new UserManager({
     redirect_uri: window.location.origin + "/auth_callback",
     post_logout_redirect_uri: window.location.origin + "/auth_callback",
     response_type: "code",
-    scope: "openid profile email",
+    scope: "openid profile email offline-access",
     automaticSilentRenew: true,
     userStore: new WebStorageStateStore({
         store: window.localStorage,
