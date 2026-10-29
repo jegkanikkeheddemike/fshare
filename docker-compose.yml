@@ -17,7 +17,7 @@ services:
       target: development
     volumes:
       - ./fshare-web:/app
-    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    command: npm run dev -- --host 0.0.0.0
     networks:
     - fshare-internal
 
