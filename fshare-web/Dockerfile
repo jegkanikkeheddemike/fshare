@@ -1,18 +1,12 @@
 # Development
-FROM node:22-bookworm AS development
+FROM node:26-bookworm AS development
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm ci
-
-COPY . .
-
-EXPOSE 5173
 
 
 # Build React
-FROM node:22-bookworm AS frontend
+FROM node:26-bookworm AS frontend
 
 WORKDIR /app
 

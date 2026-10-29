@@ -1,35 +1,48 @@
 services:
-  fshare-backend:
+  api:
     build:
       context: ./fshare-backend
-      target: production
-    restart: unless-stopped
-    depends_on:
-    - redis
-    user: "1001:1001"
+      target: development
     volumes:
-      - /home/fshare/public:/public
+      - ./fshare-backend:/app
+      - ./data/public:/public
       - ./data/users:/users
       - ./data/thumbnails:/thumbnails
+    networks:
+    - fshare-internal
+
+  web:
+    build:
+      context: ./fshare-web
+      target: development
+    volumes:
+      - ./fshare-web:/app
+    command: sh -c "npm ci && npm run dev -- --host 0.0.0.0"
+    networks:
+    - fshare-internal
+
   redis:
     image: redis:latest
     container_name: redis
     restart: unless-stopped
-
+    networks:
+    - fshare-internal
+  
   caddy:
-    build:
-        context: ./fshare-web
-        target: production
+    image: caddy:2
     restart: unless-stopped
+    networks:
+    - fshare-internal
     ports:
-      - "9000:80"
+      - "8080:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
-    depends_on:
-      - fshare-backend
 
 volumes:
   caddy-data:
   caddy-config:
+
+networks:
+  fshare-internal:
