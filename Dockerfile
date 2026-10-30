@@ -7,7 +7,7 @@ COPY package.json /app
 
 RUN npm install
 
-FROM node:26-bookworm as web-builder
+FROM node:26-bookworm AS web-builder
 
 WORKDIR /app
 
@@ -15,10 +15,10 @@ COPY fshare-web /app
 
 RUN npm ci
 
-RUN npm build
+RUN npm run build
 
 
-FROM caddy:2 as web-prod
+FROM caddy:2 AS web-prod
 
 COPY --from=web-builder /app/dist /srv
 COPY Caddyfile.prod /etc/caddy/Caddyfile
