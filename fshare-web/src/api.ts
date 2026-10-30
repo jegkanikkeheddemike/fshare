@@ -28,7 +28,7 @@ export const api = async (
         headers.set("Authorization", `Bearer ${user.access_token}`);
     }
 
-    return fetch("/api" + endpoint, {
+    return fetch(endpoint, {
         ...options,
         headers,
     });

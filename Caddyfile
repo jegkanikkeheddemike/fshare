@@ -1,13 +1,24 @@
-http://f-skipper.com {
-	handle /api/* {
-		reverse_proxy fshare-backend:9300 {
+http://localhost:80 {
+	@api {
+		path /upload/*
+		path /mkdir/*
+		path /delete/*
+		path /rename/*
+		path /access_key/*
+		path /thumbnail/*
+		path /file/*
+		path /dir/*
+	}
+
+	handle @api {
+		reverse_proxy api:9300 {
 			lb_try_duration 10s
 		}
 	}
 
 	handle {
-		root * /srv
-		try_files {path} /index.html
-		file_server
+		reverse_proxy web:5173 {
+			lb_try_duration 10s
+		}
 	}
 }

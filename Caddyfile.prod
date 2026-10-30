@@ -1,0 +1,27 @@
+http://f-skipper.com {
+    @api {
+		path /upload/*
+		path /mkdir/*
+		path /delete/*
+		path /rename/*
+		path /access_key/*
+		path /thumbnail/*
+		path /file/*
+		path /dir/*
+	}
+
+	handle @api {
+		reverse_proxy fshare-api:9300 {
+			lb_try_duration 10s
+		}
+	}
+
+	handle {
+		root * /srv
+
+        encode zstd gzip
+
+		try_files {path} /index.html
+		file_server
+	}
+}

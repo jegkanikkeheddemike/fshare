@@ -1,35 +1,53 @@
 services:
-  fshare-backend:
+  api:
     build:
-      context: ./fshare-backend
-      target: production
-    restart: unless-stopped
-    depends_on:
-    - redis
-    user: "1001:1001"
+      context: .
+      target: api-development
     volumes:
-      - /home/fshare/public:/public
-      - ./data/users:/users
-      - ./data/thumbnails:/thumbnails
-  redis:
-    image: redis:latest
-    container_name: redis
-    restart: unless-stopped
+      - ./fshare-backend:/app
+      - ./migration:/migration
+      - ./data:/data
+    networks:
+    - fshare-internal
+    environment:
+      DATABASE_URL: postgres://fshare:fshare-password@postgres:5432/fshare-md
 
-  caddy:
+  web:
     build:
-        context: ./fshare-web
-        target: production
-    restart: unless-stopped
+      context: .
+      target: web-development
+    volumes:
+      - ./fshare-web:/app
+    command: npm run dev -- --host 0.0.0.0
+    networks:
+    - fshare-internal
+
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: fshare
+      POSTGRES_PASSWORD: fshare-password
+      POSTGRES_DB: fshare-md
+    networks:
+    - fshare-internal
     ports:
-      - "9000:80"
+    - "5432:5432"
+  
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    networks:
+    - fshare-internal
+    ports:
+      - "8080:80"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
-    depends_on:
-      - fshare-backend
 
 volumes:
   caddy-data:
   caddy-config:
+
+networks:
+  fshare-internal:

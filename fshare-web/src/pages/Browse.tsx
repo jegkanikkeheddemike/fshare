@@ -245,7 +245,7 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
                 return
             }
             const { key } = await resp.json()
-            window.open(window.location.origin + "/api/file/" + dir_path + entry.relative_name + `?access_key=${key}`);
+            window.open(window.location.origin + "/file/" + dir_path + entry.relative_name + `?access_key=${key}`);
 
         });
     }, [entry, dir_path]);
@@ -315,7 +315,7 @@ const DirEntry = (props: { entry: DirEntry, dir_path: string, activeMeatball: bo
         return <Link to={entry.relative_name + "/"}>{content}</Link>
     } else {
         const access_key_part = entry.access_key ? `?access_key=${entry.access_key}` : "";
-        return <a href={`/api/file/${dir_path + entry.relative_name}${access_key_part}`}>{content}</a>;
+        return <a href={`/file/${dir_path + entry.relative_name}${access_key_part}`}>{content}</a>;
     }
 }
 
