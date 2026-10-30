@@ -1556,6 +1556,7 @@ dependencies = [
  "axum-anyhow",
  "axum-keycloak-auth",
  "ctrlc",
+ "futures",
  "migration",
  "mime_guess",
  "sea-orm",

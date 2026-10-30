@@ -1,6 +1,10 @@
 use std::{env, ops::Deref, sync::Arc};
 
-use axum::{Router, extract::DefaultBodyLimit, routing::get};
+use axum::{
+    Router,
+    extract::DefaultBodyLimit,
+    routing::{get, post},
+};
 use axum_keycloak_auth::{
     PassthroughMode, Url,
     instance::{KeycloakAuthInstance, KeycloakConfig},
@@ -8,6 +12,7 @@ use axum_keycloak_auth::{
 };
 use sea_orm::{Database, DatabaseConnection};
 use tower_http::trace::TraceLayer;
+use tracing::error;
 
 mod access_keys;
 mod db;
@@ -20,11 +25,31 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .with_file(true)
-        .with_level(true)
-        .with_line_number(true)
-        .init();
+    #[cfg(debug_assertions)]
+    {
+        tracing_subscriber::fmt()
+            .pretty()
+            .with_file(true)
+            .with_level(true)
+            .with_line_number(true)
+            .init();
+
+        axum_anyhow::on_error(|err| {
+            error!("Internal error: {err:#?}");
+        });
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        tracing_subscriber::fmt()
+            .with_file(true)
+            .with_level(true)
+            .with_line_number(true)
+            .init();
+
+        axum_anyhow::on_error(|err| {
+            error!("Internal error: {err:?}");
+        });
+    }
 
     let db_fut = tokio::spawn(async {
         Database::connect(env::var("DATABASE_URL").unwrap().deref())
@@ -47,11 +72,11 @@ async fn main() {
     let appstate = AppState { db };
 
     let app = Router::new()
-        // .route("/upload/{*path}", post(storage::upload))
+        .route("/upload/{*path}", post(entry_data::upload))
         .layer(DefaultBodyLimit::max(2_000_000_000))
-        // .route("/mkdir/{*path}", post(storage::mkdir))
-        // .route("/delete/{*path}", post(storage::delete))
-        // .route("/rename/{*path}", post(storage::rename))
+        .route("/mkdir/{*path}", post(entry_data::mkdir))
+        .route("/delete/{*path}", post(entry_data::delete))
+        .route("/rename/{*path}", post(entry_data::rename))
         // .route("/access_key/{*path}", post(access_keys::new_access_key))
         .layer(
             KeycloakAuthLayer::<String>::builder()
@@ -60,18 +85,7 @@ async fn main() {
                 .expected_audiences(vec!["account".to_string()])
                 .build(),
         )
-        // .nest_service(
-        //     "/thumbnail",
-        //     Router::new()
-        //         .fallback_service(ServeDir::new("/thumbnails"))
-        //         .layer(middleware::from_fn(storage::prepare_thumbnail)),
-        // )
-        // .nest_service(
-        //     "/file",
-        //     Router::new()
-        //         .fallback_service(ServeDir::new("/"))
-        //         .layer(middleware::from_fn(storage::prepare_file_req)),
-        // )
+        .route("/thumbnail/{*path}", get(entry_data::get_thumbnail))
         .route("/file/{*path}", get(entry_data::get_file))
         .route("/dir/", get(entry_data::get_root_dir))
         .route("/dir/{*path}", get(entry_data::get_dir))

@@ -6,7 +6,6 @@ use axum::{
 };
 use axum_anyhow::ApiResult;
 use axum_keycloak_auth::decode::KeycloakToken;
-use tracing::error;
 use uuid::Uuid;
 
 

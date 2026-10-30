@@ -18,6 +18,7 @@ tracing = "*"
 tracing-subscriber = "*"
 axum-keycloak-auth = "0.8.3"
 thumbnails = {git = "https://github.com/jegkanikkeheddemike/thumbnails"}
+futures = "*"
 
 migration = {path ="../migration"}
 sea-orm = "*"

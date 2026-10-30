@@ -3,10 +3,25 @@ FROM node:26-bookworm AS web-development
 
 WORKDIR /app
 
-COPY package.json /app/
+COPY package.json /app
 
 RUN npm install
 
+FROM node:26-bookworm as web-builder
+
+WORKDIR /app
+
+COPY fshare-web /app
+
+RUN npm ci
+
+RUN npm build
+
+
+FROM caddy:2 as web-prod
+
+COPY --from=web-builder /app/dist /srv
+COPY Caddyfile.prod /etc/caddy/Caddyfile
 
 
 FROM rust:bookworm AS api-development
@@ -72,17 +87,11 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY Cargo.toml Cargo.lock ./
-COPY src ./src
+COPY fshare-backend /app
 
-RUN --mount=type=cache,target=/app/target \
-    --mount=type=cache,target=/var/cache/cargo \
-    CARGO_HOME=/var/cache/cargo \
-    cargo build --release \
-    && cp /app/target/release/fshare-backend /usr/local/bin/fshare-backend
+RUN cargo build --release
 
-
-FROM debian:bookworm-slim AS api-production
+FROM debian:bookworm-slim AS api-prod
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -97,7 +106,7 @@ RUN apt-get update \
         ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=api-builder /usr/local/bin/fshare-backend /usr/local/bin/fshare-backend
+COPY --from=api-builder /app/target/release/fshare-backend /usr/local/bin/fshare-backend
 
 # Copy PDFium from the builder instead of downloading it again.
 COPY --from=api-builder /usr/local/lib/libpdfium.so /usr/local/lib/libpdfium.so
