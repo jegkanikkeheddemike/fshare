@@ -67,6 +67,12 @@ async fn main() {
     });
 
     let db = db_fut.await.unwrap();
+    #[cfg(not(debug_assertions))]
+    {
+        use migration::MigratorTrait;
+        migration::Migrator::up(&db, None).await.unwrap();
+    }
+
     let keycloak_auth_instance = keycloak_auth_instance_fut.await.unwrap();
 
     let appstate = AppState { db };
