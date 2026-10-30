@@ -1,32 +1,37 @@
 services:
   api:
     build:
-      context: ./fshare-backend
-      target: development
+      context: .
+      target: api-development
     volumes:
       - ./fshare-backend:/app
-      - ./data/public:/public
-      - ./data/users:/users
-      - ./data/thumbnails:/thumbnails
+      - ./migration:/migration
+      - ./data:/data
     networks:
     - fshare-internal
+    environment:
+      DATABASE_URL: postgres://fshare:fshare-password@postgres:5432/fshare-md
 
   web:
     build:
-      context: ./fshare-web
-      target: development
+      context: .
+      target: web-development
     volumes:
       - ./fshare-web:/app
     command: npm run dev -- --host 0.0.0.0
     networks:
     - fshare-internal
 
-  redis:
-    image: redis:latest
-    container_name: redis
-    restart: unless-stopped
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: fshare
+      POSTGRES_PASSWORD: fshare-password
+      POSTGRES_DB: fshare-md
     networks:
     - fshare-internal
+    ports:
+    - "5432:5432"
   
   caddy:
     image: caddy:2

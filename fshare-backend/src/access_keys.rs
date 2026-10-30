@@ -6,11 +6,9 @@ use axum::{
 };
 use axum_anyhow::ApiResult;
 use axum_keycloak_auth::decode::KeycloakToken;
-use redis::{AsyncTypedCommands, IntegerReplyOrNoOp};
 use tracing::error;
 use uuid::Uuid;
 
-use crate::{redis_conn, storage};
 
 fn redis_key(access_key: Uuid) -> String {
     format!("ACCESS_KEY/{access_key}")
@@ -19,34 +17,37 @@ fn redis_key(access_key: Uuid) -> String {
 const DEFAULT_ACCESS_KEY_DURATION: u64 = 5 * 60; // 5 minutes
 
 pub async fn create(path: PathBuf, expiration: Option<Duration>) -> Uuid {
-    let access_key = Uuid::new_v4();
+    // let access_key = Uuid::new_v4();
 
-    let mut redis = redis_conn::get().await;
 
-    redis
-        .set_ex(
-            redis_key(access_key),
-            path.to_str().unwrap(),
-            expiration
-                .map(|d| d.as_secs())
-                .unwrap_or(DEFAULT_ACCESS_KEY_DURATION),
-        )
-        .await
-        .unwrap();
+    // redis
+    //     .set_ex(
+    //         redis_key(access_key),
+    //         path.to_str().unwrap(),
+    //         expiration
+    //             .map(|d| d.as_secs())
+    //             .unwrap_or(DEFAULT_ACCESS_KEY_DURATION),
+    //     )
+    //     .await
+    //     .unwrap();
 
-    access_key
+    // access_key
+
+    todo!()
 }
 
 pub async fn get(access_key: Uuid) -> Option<(PathBuf, usize)> {
-    let mut redis = redis_conn::get().await;
-    let resp = redis.get(redis_key(access_key)).await.unwrap()?;
-    let IntegerReplyOrNoOp::IntegerReply(ttl) = redis.ttl(redis_key(access_key)).await.unwrap()
-    else {
-        error!("Found stored access key but no expiration set. This is a BUG!");
-        return None;
-    };
+    // let mut redis = redis_conn::get().await;
+    // let resp = redis.get(redis_key(access_key)).await.unwrap()?;
+    // let IntegerReplyOrNoOp::IntegerReply(ttl) = redis.ttl(redis_key(access_key)).await.unwrap()
+    // else {
+    //     error!("Found stored access key but no expiration set. This is a BUG!");
+    //     return None;
+    // };
 
-    return Some((resp.parse().ok()?, ttl));
+    // return Some((resp.parse().ok()?, ttl));
+
+    todo!()
 }
 
 #[derive(serde::Serialize)]
@@ -64,13 +65,15 @@ pub async fn new_access_key(
     Extension(token): Extension<KeycloakToken<String>>,
     duration: Query<AKDuration>,
 ) -> ApiResult<Json<NewAccessKey>> {
-    let (_md, canon_path) = storage::get_md(path, Some(token.subject)).await?;
 
-    return Ok(Json(NewAccessKey {
-        key: create(
-            canon_path,
-            duration.duration.map(|d| Duration::from_secs(d)),
-        )
-        .await,
-    }));
+    todo!()
+    // let (_md, canon_path) = storage::get_md(path, Some(token.subject)).await?;
+
+    // return Ok(Json(NewAccessKey {
+    //     key: create(
+    //         canon_path,
+    //         duration.duration.map(|d| Duration::from_secs(d)),
+    //     )
+    //     .await,
+    // }));
 }

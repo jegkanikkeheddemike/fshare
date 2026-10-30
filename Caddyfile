@@ -1,5 +1,16 @@
 http://localhost:80 {
-	handle /api/* {
+	@api {
+		path /upload/*
+		path /mkdir/*
+		path /delete/*
+		path /rename/*
+		path /access_key/*
+		path /thumbnail/*
+		path /file/*
+		path /dir/*
+	}
+
+	handle @api {
 		reverse_proxy api:9300 {
 			lb_try_duration 10s
 		}
