@@ -88,6 +88,7 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY fshare-backend /app
+COPY migration /migration
 
 RUN cargo build --release
 
