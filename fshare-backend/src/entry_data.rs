@@ -192,7 +192,7 @@ pub async fn mkdir(
     info!("Creating dir {name} in {dir}");
 
     let (owner, owner_type) = match dir {
-        "/" => ("public".to_string(), "public".to_string()),
+        "" => ("public".to_string(), "public".to_string()),
         _ => {
             let ownerlist = Ownerlist(&[("public", "public")]);
 
