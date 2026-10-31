@@ -42,7 +42,8 @@ pub async fn get_or_create(
 
     let access_key = Uuid::new_v4().to_string();
 
-    let expiration = chrono::Local::now() + expiration.unwrap_or(DEFAULT_ACCESS_KEY_DURATION);
+    let duration = expiration.unwrap_or(DEFAULT_ACCESS_KEY_DURATION);
+    let expiration = chrono::Local::now() + duration;
 
     access_keys::Entity::insert(access_keys::ActiveModel {
         key: ActiveValue::Set(access_key.clone()),

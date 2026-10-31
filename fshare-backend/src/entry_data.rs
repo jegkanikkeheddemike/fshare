@@ -2,9 +2,10 @@ use axum::{
     Extension, Json,
     body::Body,
     extract::{Path, Query, Request, State},
+    http::HeaderValue,
     response::IntoResponse,
 };
-use axum_anyhow::{ApiError, ApiResult};
+use axum_anyhow::ApiResult;
 use axum_keycloak_auth::{
     KeycloakAuthStatus,
     decode::{KeycloakToken, ProfileAndEmail},
@@ -198,9 +199,14 @@ pub async fn get_file(
         }
     };
 
-    Ok(ServeFile::new(data_path(&storage_path))
+    let mut resp = ServeFile::new(data_path(&storage_path))
         .oneshot(request)
-        .await?)
+        .await?;
+
+    resp.headers_mut()
+        .insert("Cache-Control", HeaderValue::from_str("no-cache").unwrap());
+
+    Ok(resp)
 }
 
 pub async fn get_thumbnail(
