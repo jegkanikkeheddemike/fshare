@@ -125,6 +125,7 @@ def login():
 
 
 
+
 class FileMigrator:
     def __init__(self, api_base, token, token_endpoint):
         self.api_base = api_base.rstrip("/")
@@ -137,50 +138,50 @@ class FileMigrator:
         self.directories_created = 0
         self.files_uploaded = 0
         self.files_skipped = 0
+
     def update_auth_header(self):
         self.session.headers["Authorization"] = (
             f"Bearer {self.token['access_token']}"
         )
-def refresh_token(self):
-    old_refresh_token = self.token.get("refresh_token")
 
-    if not old_refresh_token:
-        raise RuntimeError(
-            "Access token expired and no refresh token is available."
+    def refresh_token(self):
+        old_refresh_token = self.token.get("refresh_token")
+
+        if not old_refresh_token:
+            raise RuntimeError(
+                "Access token expired and no refresh token is available."
+            )
+
+        print("\nAccess token expired. Refreshing...")
+
+        response = requests.post(
+            self.token_endpoint,
+            data={
+                "grant_type": "refresh_token",
+                "client_id": CLIENT_ID,
+                "refresh_token": old_refresh_token,
+            },
+            timeout=15,
         )
 
-    print("\nAccess token expired. Refreshing...")
+        response.raise_for_status()
 
-    response = requests.post(
-        self.token_endpoint,
-        data={
-            "grant_type": "refresh_token",
-            "client_id": CLIENT_ID,
-            "refresh_token": old_refresh_token,
-        },
-        timeout=15,
-    )
+        new_token = response.json()
 
-    response.raise_for_status()
+        if not new_token.get("refresh_token"):
+            new_token["refresh_token"] = old_refresh_token
 
-    new_token = response.json()
+        self.token = new_token
+        self.update_auth_header()
 
-    if not new_token.get("refresh_token"):
-        new_token["refresh_token"] = old_refresh_token
+        print("Token refreshed successfully.\n")
 
-    self.token = new_token
-    self.update_auth_header()
-
-    print("Token refreshed successfully.\n")
     def request(self, method, url, **kwargs):
         response = self.session.request(
             method, url, **kwargs
         )
 
         if response.status_code == 401:
-            if "expired" not in response.text.lower():
-                response.raise_for_status()
-
             self.refresh_token()
 
             # Rewind file streams before retrying uploads.
@@ -195,8 +196,6 @@ def refresh_token(self):
         return response
 
     def url(self, endpoint, path="", trailing_slash=False):
-        from urllib.parse import quote
-
         encoded_path = quote(path.strip("/"), safe="/")
 
         result = f"{self.api_base}/{endpoint}/{encoded_path}"
@@ -207,14 +206,6 @@ def refresh_token(self):
         return result
 
     def list_directory(self, path):
-        """
-        Returns a dictionary:
-        {
-            "filename": {"is_dir": False, ...},
-            "subdirectory": {"is_dir": True, ...}
-        }
-        """
-
         url = self.url("dir", path, trailing_slash=True)
 
         response = self.request(
@@ -223,7 +214,6 @@ def refresh_token(self):
             timeout=(10, 60),
         )
 
-        # A missing destination directory can be created.
         if response.status_code == 404:
             return None
 
@@ -282,6 +272,7 @@ def refresh_token(self):
                 f"HTTP {response.status_code}\n"
                 f"{response.text[:1000]}"
             )
+
 
 
 def migrate_directory(local_root, migrator, remote_root=""):
