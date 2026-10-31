@@ -33,84 +33,104 @@ SCOPE = "openid profile email"
 # ---------------------------------------------------------
 # OAuth login
 # ---------------------------------------------------------
+import time
+import requests
+
+ISSUER = "https://auth.f-skipper.com/realms/skippernet"
+CLIENT_ID = "fshare-migration-cli"
+SCOPE = "openid profile email"
+
 
 def login():
-    print("Fetching OpenID configuration...")
-
     metadata_url = f"{ISSUER}/.well-known/openid-configuration"
 
     metadata = requests.get(metadata_url, timeout=15)
     metadata.raise_for_status()
     metadata = metadata.json()
 
-    code_verifier = secrets.token_urlsafe(64)
-
-    oauth = OAuth2Session(
-        CLIENT_ID,
-        redirect_uri=REDIRECT_URI,
-        scope=SCOPE,
-        code_challenge_method="S256",
-        token_endpoint_auth_method="none",
+    device_endpoint = metadata.get(
+        "device_authorization_endpoint",
+        f"{ISSUER}/protocol/openid-connect/auth/device",
     )
 
-    authorization_url, state = oauth.create_authorization_url(
-        metadata["authorization_endpoint"],
-        redirect_uri=REDIRECT_URI,
-        code_verifier=code_verifier,
+    token_endpoint = metadata["token_endpoint"]
+
+    # Request a device code.
+    response = requests.post(
+        device_endpoint,
+        data={
+            "client_id": CLIENT_ID,
+            "scope": SCOPE,
+        },
+        timeout=15,
+    )
+    response.raise_for_status()
+
+    device = response.json()
+
+    verification_uri = device.get(
+        "verification_uri_complete",
+        device["verification_uri"],
     )
 
-    callback = {}
+    print("\n" + "=" * 55)
+    print("AUTHENTICATION REQUIRED")
+    print("=" * 55)
+    print(f"\nOpen this URL on your computer or phone:\n")
+    print(verification_uri)
 
-    class CallbackHandler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            callback["url"] = f"http://{REDIRECT_HOST}:{REDIRECT_PORT}{self.path}"
+    if not device.get("verification_uri_complete"):
+        print(f"\nEnter this code: {device['user_code']}")
 
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
+    print("\nWaiting for authentication...")
+    print("=" * 55 + "\n")
 
-            self.wfile.write(
-                b"<h1>Login successful!</h1>"
-                b"<p>You can close this window and return to the terminal.</p>"
-            )
+    # Poll the token endpoint.
+    interval = device.get("interval", 5)
+    expires_at = time.monotonic() + device["expires_in"]
 
-        def log_message(self, *args):
-            pass
+    while time.monotonic() < expires_at:
+        time.sleep(interval)
 
-    server = HTTPServer((REDIRECT_HOST, REDIRECT_PORT), CallbackHandler)
-    server.timeout = 300
+        response = requests.post(
+            token_endpoint,
+            data={
+                "grant_type": (
+                    "urn:ietf:params:oauth:grant-type:device_code"
+                ),
+                "client_id": CLIENT_ID,
+                "device_code": device["device_code"],
+            },
+            timeout=15,
+        )
 
-    print("\nOpening browser for authentication...")
-    webbrowser.open(authorization_url)
+        result = response.json()
 
-    print(f"If the browser does not open, visit:\n{authorization_url}\n")
-    print("Waiting for OAuth callback...")
+        if response.ok:
+            print("Authentication successful!\n")
+            return result, token_endpoint
 
-    server.handle_request()
-    server.server_close()
+        error = result.get("error")
 
-    if "url" not in callback:
-        raise TimeoutError("Timed out waiting for OAuth callback")
+        if error == "authorization_pending":
+            print("Waiting for login...", end="\r")
+            continue
 
-    callback_url = callback["url"]
+        if error == "slow_down":
+            interval += 5
+            continue
 
-    params = parse_qs(urlparse(callback_url).query)
+        if error == "access_denied":
+            raise RuntimeError("Login was denied.")
 
-    if "error" in params:
-        raise RuntimeError(f"OAuth error: {params['error'][0]}")
+        if error == "expired_token":
+            raise RuntimeError("Device code expired. Please try again.")
 
-    print("Exchanging authorization code for access token...")
+        raise RuntimeError(
+            f"Authentication failed: {result}"
+        )
 
-    token = oauth.fetch_token(
-        metadata["token_endpoint"],
-        authorization_response=callback_url,
-        code_verifier=code_verifier,
-    )
-
-    print("Authentication successful!\n")
-
-    return token, oauth, metadata["token_endpoint"]
-
+    raise TimeoutError("Device authorization timed out.")
 
 # ---------------------------------------------------------
 # API helpers
@@ -119,10 +139,9 @@ def login():
 
 
 class FileMigrator:
-    def __init__(self, api_base, token, oauth, token_endpoint):
+    def __init__(self, api_base, token, token_endpoint):
         self.api_base = api_base.rstrip("/")
         self.token = token
-        self.oauth = oauth
         self.token_endpoint = token_endpoint
 
         self.session = requests.Session()
@@ -131,36 +150,41 @@ class FileMigrator:
         self.directories_created = 0
         self.files_uploaded = 0
         self.files_skipped = 0
-
     def update_auth_header(self):
         self.session.headers["Authorization"] = (
             f"Bearer {self.token['access_token']}"
         )
+def refresh_token(self):
+    old_refresh_token = self.token.get("refresh_token")
 
-    def refresh_token(self):
-        old_refresh_token = self.token.get("refresh_token")
-
-        if not old_refresh_token:
-            raise RuntimeError(
-                "Access token expired and no refresh token is available."
-            )
-
-        print("\nAccess token expired. Refreshing...")
-
-        new_token = self.oauth.refresh_token(
-            self.token_endpoint,
-            refresh_token=old_refresh_token,
+    if not old_refresh_token:
+        raise RuntimeError(
+            "Access token expired and no refresh token is available."
         )
 
-        # Some providers don't return a new refresh token.
-        if not new_token.get("refresh_token"):
-            new_token["refresh_token"] = old_refresh_token
+    print("\nAccess token expired. Refreshing...")
 
-        self.token = new_token
-        self.update_auth_header()
+    response = requests.post(
+        self.token_endpoint,
+        data={
+            "grant_type": "refresh_token",
+            "client_id": CLIENT_ID,
+            "refresh_token": old_refresh_token,
+        },
+        timeout=15,
+    )
 
-        print("Token refreshed successfully.\n")
+    response.raise_for_status()
 
+    new_token = response.json()
+
+    if not new_token.get("refresh_token"):
+        new_token["refresh_token"] = old_refresh_token
+
+    self.token = new_token
+    self.update_auth_header()
+
+    print("Token refreshed successfully.\n")
     def request(self, method, url, **kwargs):
         response = self.session.request(
             method, url, **kwargs
@@ -401,12 +425,11 @@ def main():
     CLIENT_ID = args.client_id
 
     try:
-        token, oauth, token_endpoint = login()
+        token, token_endpoint = login()
 
         migrator = FileMigrator(
             args.api_base,
             token,
-            oauth,
             token_endpoint,
         )
 
