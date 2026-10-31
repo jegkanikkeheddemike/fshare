@@ -13,9 +13,6 @@ from urllib.parse import quote, urlparse, parse_qs
 
 import requests
 
-from authlib.integrations.requests_client import OAuth2Session
-
-
 # ---------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------
