@@ -16,6 +16,12 @@ http://f-skipper.com {
 		}
 	}
 
+	handle_path /api/* {
+        reverse_proxy fshare-api:9300 {
+            lb_try_duration 10s
+        }
+    }
+
 	handle {
 		root * /srv
 

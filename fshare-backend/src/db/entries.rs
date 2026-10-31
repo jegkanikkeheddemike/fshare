@@ -17,9 +17,20 @@ pub struct Model {
     pub storage_path: Option<String>,
     pub thumbnail_path: Option<String>,
     pub created_at: DateTime,
+    #[sea_orm(unique)]
+    pub reference_id: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-pub enum Relation {}
+pub enum Relation {
+    #[sea_orm(has_many = "super::access_keys::Entity")]
+    AccessKeys,
+}
+
+impl Related<super::access_keys::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::AccessKeys.def()
+    }
+}
 
 impl ActiveModelBehavior for ActiveModel {}

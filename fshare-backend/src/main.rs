@@ -5,6 +5,7 @@ use axum::{
     extract::DefaultBodyLimit,
     routing::{get, post},
 };
+use axum_anyhow::ApiError;
 use axum_keycloak_auth::{
     PassthroughMode, Url,
     instance::{KeycloakAuthInstance, KeycloakConfig},
@@ -14,13 +15,17 @@ use sea_orm::{Database, DatabaseConnection};
 use tower_http::trace::TraceLayer;
 use tracing::error;
 
-mod access_keys;
+mod access_key_utils;
 mod db;
 mod entry_data;
 
 #[derive(Debug, Clone)]
 pub struct AppState {
     db: DatabaseConnection,
+}
+
+pub fn not_found() -> ApiError {
+    return axum_anyhow::not_found("Not found", "No item or directory at this path");
 }
 
 #[tokio::main]
@@ -35,7 +40,7 @@ async fn main() {
             .init();
 
         axum_anyhow::on_error(|err| {
-            error!("Internal error: {err:#?}");
+            error!("Error: {err:?}");
         });
     }
     #[cfg(not(debug_assertions))]
@@ -47,7 +52,9 @@ async fn main() {
             .init();
 
         axum_anyhow::on_error(|err| {
-            error!("Internal error: {err:?}");
+            if err.status().is_server_error() {
+                error!("Internal error: {err:#?}");
+            }
         });
     }
 
