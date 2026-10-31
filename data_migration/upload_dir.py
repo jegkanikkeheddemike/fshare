@@ -341,18 +341,18 @@ def migrate_directory(local_root, migrator, remote_root=""):
             if child.is_symlink() or not child.is_file():
                 continue
 
-            remote_entry = existing.get(child.name)
+            # remote_entry = existing.get(child.name)
 
-            if remote_entry:
-                if remote_entry["is_dir"]:
-                    raise RuntimeError(
-                        f"Remote directory conflicts with local file: "
-                        f"{remote_dir}/{child.name}"
-                    )
+            # if remote_entry:
+            #     if remote_entry["is_dir"]:
+            #         raise RuntimeError(
+            #             f"Remote directory conflicts with local file: "
+            #             f"{remote_dir}/{child.name}"
+            #         )
 
-                print(f"[SKIP] {remote_dir}/{child.name}")
-                migrator.files_skipped += 1
-                continue
+            #     print(f"[SKIP] {remote_dir}/{child.name}")
+            #     migrator.files_skipped += 1
+            #     continue
 
             remote_file = "/".join(
                 filter(None, [remote_dir, child.name])
