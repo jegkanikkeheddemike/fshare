@@ -2,14 +2,13 @@
 #!/usr/bin/env python3
 
 import argparse
-import os
-import secrets
 import sys
-import webbrowser
 
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import quote, urlparse, parse_qs
+import hashlib
+import base64
+import secrets
 
 import requests
 
@@ -20,9 +19,9 @@ import requests
 ISSUER = "https://auth.f-skipper.com/realms/skippernet"
 CLIENT_ID = "fshare-webauth"
 
-REDIRECT_HOST = "127.0.0.1"
-REDIRECT_PORT = 8080
-REDIRECT_URI = f"http://{REDIRECT_HOST}:{REDIRECT_PORT}/callback"
+# REDIRECT_HOST = "127.0.0.1"
+# REDIRECT_PORT = 8080
+# REDIRECT_URI = f"http://{REDIRECT_HOST}:{REDIRECT_PORT}/callback"
 
 SCOPE = "openid profile email"
 
@@ -37,31 +36,44 @@ ISSUER = "https://auth.f-skipper.com/realms/skippernet"
 CLIENT_ID = "fshare-migration-cli"
 SCOPE = "openid profile email"
 
-
 def login():
     metadata_url = f"{ISSUER}/.well-known/openid-configuration"
 
-    metadata = requests.get(metadata_url, timeout=15)
-    metadata.raise_for_status()
-    metadata = metadata.json()
+    metadata_response = requests.get(metadata_url, timeout=15)
+    metadata_response.raise_for_status()
+    metadata = metadata_response.json()
 
     device_endpoint = metadata.get(
         "device_authorization_endpoint",
         f"{ISSUER}/protocol/openid-connect/auth/device",
     )
-
     token_endpoint = metadata["token_endpoint"]
 
-    # Request a device code.
+    # Generate PKCE verifier and S256 challenge.
+    code_verifier = secrets.token_urlsafe(64)
+
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode()).digest()
+    ).decode().rstrip("=")
+
+    # Request device authorization.
     response = requests.post(
         device_endpoint,
         data={
             "client_id": CLIENT_ID,
             "scope": SCOPE,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "S256",
         },
         timeout=15,
     )
-    response.raise_for_status()
+
+    if not response.ok:
+        raise RuntimeError(
+            f"Device authorization failed: HTTP {response.status_code}\n"
+            f"URL: {device_endpoint}\n"
+            f"Response: {response.text[:2000]}"
+        )
 
     device = response.json()
 
@@ -82,7 +94,6 @@ def login():
     print("\nWaiting for authentication...")
     print("=" * 55 + "\n")
 
-    # Poll the token endpoint.
     interval = device.get("interval", 5)
     expires_at = time.monotonic() + device["expires_in"]
 
@@ -97,6 +108,7 @@ def login():
                 ),
                 "client_id": CLIENT_ID,
                 "device_code": device["device_code"],
+                "code_verifier": code_verifier,
             },
             timeout=15,
         )
@@ -104,7 +116,7 @@ def login():
         result = response.json()
 
         if response.ok:
-            print("Authentication successful!\n")
+            print("\nAuthentication successful!\n")
             return result, token_endpoint
 
         error = result.get("error")
@@ -121,11 +133,9 @@ def login():
             raise RuntimeError("Login was denied.")
 
         if error == "expired_token":
-            raise RuntimeError("Device code expired. Please try again.")
+            raise RuntimeError("Device code expired.")
 
-        raise RuntimeError(
-            f"Authentication failed: {result}"
-        )
+        raise RuntimeError(f"Authentication failed: {result}")
 
     raise TimeoutError("Device authorization timed out.")
 
