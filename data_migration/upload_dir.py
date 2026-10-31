@@ -133,7 +133,12 @@ class FileMigrator:
         self.token_endpoint = token_endpoint
 
         self.session = requests.Session()
-        self.update_auth_header()
+        self.session = requests.Session()
+        self.session.headers.update({
+            "Authorization": f"Bearer {self.token['access_token']}",
+            "Host": "f-skipper.com",
+            "Origin": "http://f-skipper.com",
+        })
 
         self.directories_created = 0
         self.files_uploaded = 0
