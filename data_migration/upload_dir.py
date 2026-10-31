@@ -11,6 +11,7 @@ import base64
 import secrets
 import time
 import requests
+import os
 
 ISSUER = "https://auth.f-skipper.com/realms/skippernet"
 CLIENT_ID = "fshare-webauth"
