@@ -291,82 +291,46 @@ def migrate_directory(local_root, migrator, remote_root=""):
     print(f"Source:      {local_root}")
     print(f"Destination: {remote_root or '/'}\n")
 
-    def migrate(local_dir, remote_dir):
-        # Get the current contents of the remote directory.
-        existing = migrator.list_directory(remote_dir)
+    # Create the remote destination root if specified.
+    if remote_root:
+        migrator.mkdir(remote_root)
 
-        # Create the destination directory if it doesn't exist.
-        if existing is None:
-            if not remote_dir:
-                raise RuntimeError(
-                    "Could not access the remote root directory."
-                )
+    for current, dirs, files in os.walk(local_root, topdown=True):
+        current = Path(current)
 
-            migrator.mkdir(remote_dir)
-            existing = migrator.list_directory(remote_dir)
-
-            if existing is None:
-                raise RuntimeError(
-                    f"Could not access directory after creation: "
-                    f"{remote_dir}"
-                )
-
-        # Sort for predictable migration order.
-        children = sorted(
-            local_dir.iterdir(),
-            key=lambda p: p.name,
+        # Don't follow symlinks.
+        dirs[:] = sorted(
+            d for d in dirs
+            if not (current / d).is_symlink()
         )
 
-        # Process directories first.
-        for child in children:
-            if child.is_symlink() or not child.is_dir():
+        relative_dir = current.relative_to(local_root)
+
+        remote_dir = "/".join(
+            filter(None, [remote_root, relative_dir.as_posix()])
+        )
+
+        # Create every directory, including empty ones.
+        if relative_dir.parts:
+            migrator.mkdir(remote_dir)
+
+        # Upload files in the current directory.
+        for filename in sorted(files):
+            local_file = current / filename
+
+            if local_file.is_symlink() or not local_file.is_file():
+                print(f"[SKIP] Symlink or non-regular file: {local_file}")
                 continue
-
-            remote_child = "/".join(
-                filter(None, [remote_dir, child.name])
-            )
-
-            remote_entry = existing.get(child.name)
-
-            if remote_entry and not remote_entry["is_dir"]:
-                raise RuntimeError(
-                    f"Remote file conflicts with local directory: "
-                    f"{remote_child}"
-                )
-
-            migrate(child, remote_child)
-
-        # Process files.
-        for child in children:
-            if child.is_symlink() or not child.is_file():
-                continue
-
-            # remote_entry = existing.get(child.name)
-
-            # if remote_entry:
-            #     if remote_entry["is_dir"]:
-            #         raise RuntimeError(
-            #             f"Remote directory conflicts with local file: "
-            #             f"{remote_dir}/{child.name}"
-            #         )
-
-            #     print(f"[SKIP] {remote_dir}/{child.name}")
-            #     migrator.files_skipped += 1
-            #     continue
 
             remote_file = "/".join(
-                filter(None, [remote_dir, child.name])
+                filter(None, [remote_dir, filename])
             )
 
-            migrator.upload(child, remote_file)
-
-    migrate(local_root, remote_root)
+            migrator.upload(local_file, remote_file)
 
     print("\nMigration complete!")
     print(f"Directories created: {migrator.directories_created}")
     print(f"Files uploaded:      {migrator.files_uploaded}")
-    print(f"Files skipped:       {migrator.files_skipped}")
-
 
 
 # ---------------------------------------------------------
