@@ -9,31 +9,11 @@ from urllib.parse import quote, urlparse, parse_qs
 import hashlib
 import base64
 import secrets
-
-import requests
-
-# ---------------------------------------------------------
-# Configuration
-# ---------------------------------------------------------
-
-ISSUER = "https://auth.f-skipper.com/realms/skippernet"
-CLIENT_ID = "fshare-webauth"
-
-# REDIRECT_HOST = "127.0.0.1"
-# REDIRECT_PORT = 8080
-# REDIRECT_URI = f"http://{REDIRECT_HOST}:{REDIRECT_PORT}/callback"
-
-SCOPE = "openid profile email"
-
-
-# ---------------------------------------------------------
-# OAuth login
-# ---------------------------------------------------------
 import time
 import requests
 
 ISSUER = "https://auth.f-skipper.com/realms/skippernet"
-CLIENT_ID = "fshare-migration-cli"
+CLIENT_ID = "fshare-webauth"
 SCOPE = "openid profile email"
 
 def login():
