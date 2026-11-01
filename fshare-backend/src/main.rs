@@ -34,13 +34,11 @@ async fn main() {
     {
         tracing_subscriber::fmt()
             .pretty()
-            .with_file(true)
             .with_level(true)
-            .with_line_number(true)
             .init();
 
         axum_anyhow::on_error(|err| {
-            error!("Error: {err:?}");
+            error!("{err:?}");
         });
     }
     #[cfg(not(debug_assertions))]
